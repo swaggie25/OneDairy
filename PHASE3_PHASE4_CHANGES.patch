@@ -1,0 +1,2409 @@
+diff --git a/src/components/google-live-map.tsx b/src/components/google-live-map.tsx
+index 57e037b..749c62c 100644
+--- a/src/components/google-live-map.tsx
++++ b/src/components/google-live-map.tsx
+@@ -1,203 +1,282 @@
+-/// <reference types="google.maps" />
+-import { useEffect, useMemo, useRef, useState } from "react";
+-import { decodePolyline, loadGoogleMaps } from "@/lib/google-maps-loader";
+-import type { LiveCollection, LivePing, LiveRoutePoint, LiveTrip } from "@/hooks/useLiveOps";
+-
+-export type MapProps = {
+-  centre: { name: string; lat: number | null; lng: number | null } | null | undefined;
+-  trips: LiveTrip[];
+-  pings: LivePing[];
+-  points: LiveRoutePoint[];
+-  collections: LiveCollection[];
+-  focusAgentId: string | null;
+-  /** Encoded polyline of a computed driving route to overlay. */
+-  directionsPolyline?: string | null;
+-};
+-
+-const TRAIL_COLORS = ["#2563eb", "#0d9488", "#7c3aed", "#ea580c", "#be123c", "#0891b2"];
+-const DEFAULT_CENTRE = { lat: 22.3072, lng: 73.1812 };
+-
+-export default function GoogleLiveMap({
+-  centre,
+-  trips,
+-  pings,
+-  points,
+-  collections,
+-  focusAgentId,
+-  directionsPolyline,
+-}: MapProps) {
+-  const containerRef = useRef<HTMLDivElement | null>(null);
+-  const mapRef = useRef<google.maps.Map | null>(null);
+-  const overlaysRef = useRef<Array<google.maps.Marker | google.maps.Polyline>>([]);
+-  const infoRef = useRef<google.maps.InfoWindow | null>(null);
+-  const [ready, setReady] = useState(false);
+-  const [error, setError] = useState<string | null>(null);
+-
+-  useEffect(() => {
+-    let cancelled = false;
+-    loadGoogleMaps()
+-      .then((maps) => {
+-        if (cancelled || !containerRef.current) return;
+-        mapRef.current = new maps.Map(containerRef.current, {
+-          center: DEFAULT_CENTRE,
+-          zoom: 12,
+-          mapTypeControl: false,
+-          streetViewControl: false,
+-          fullscreenControl: true,
+-        });
+-        infoRef.current = new maps.InfoWindow();
+-        setReady(true);
+-      })
+-      .catch((e: Error) => !cancelled && setError(e.message));
+-    return () => {
+-      cancelled = true;
+-    };
+-  }, []);
+-
+-  const trailsByAgent = useMemo(() => {
+-    const map = new Map<string, google.maps.LatLngLiteral[]>();
+-    for (const p of pings) {
+-      if (p.lat == null || p.lng == null) continue;
+-      const list = map.get(p.agent_id) ?? [];
+-      list.push({ lat: p.lat, lng: p.lng });
+-      map.set(p.agent_id, list);
+-    }
+-    return map;
+-  }, [pings]);
+-
+-  const shownAgents = useMemo(() => {
+-    if (focusAgentId) return [focusAgentId];
+-    return trips
+-      .filter((t) => t.status === "in_progress")
+-      .map((t) => t.agent_id)
+-      .filter((id, i, arr) => arr.indexOf(id) === i);
+-  }, [trips, focusAgentId]);
+-
+-  useEffect(() => {
+-    const map = mapRef.current;
+-    const maps = typeof window !== "undefined" ? window.google?.maps : undefined;
+-    if (!ready || !map || !maps) return;
+-
+-    for (const o of overlaysRef.current) o.setMap(null);
+-    overlaysRef.current = [];
+-
+-    const bounds = new maps.LatLngBounds();
+-    let hasBounds = false;
+-
+-    const dot = (color: string, scale: number, stroke = "#ffffff") => ({
+-      path: maps.SymbolPath.CIRCLE,
+-      scale,
+-      fillColor: color,
+-      fillOpacity: 1,
+-      strokeColor: stroke,
+-      strokeWeight: 2,
+-    });
+-
+-    const addMarker = (
+-      position: google.maps.LatLngLiteral,
+-      title: string,
+-      icon: google.maps.Symbol,
+-      zIndex = 1,
+-      label?: google.maps.MarkerLabel,
+-    ) => {
+-      const marker = new maps.Marker({ map, position, icon, title, zIndex, label: label ?? null });
+-      marker.addListener("click", () => {
+-        infoRef.current?.setContent(`<div style="font-size:13px">${title}</div>`);
+-        infoRef.current?.open({ map, anchor: marker });
+-      });
+-      overlaysRef.current.push(marker);
+-      bounds.extend(position);
+-      hasBounds = true;
+-    };
+-
+-    if (centre?.lat != null && centre.lng != null) {
+-      addMarker(
+-        { lat: centre.lat, lng: centre.lng },
+-        `${centre.name} (centre)`,
+-        dot("#0f172a", 9),
+-        5,
+-      );
+-    }
+-
+-    for (const p of points) {
+-      if (p.lat == null || p.lng == null) continue;
+-      const isCurrentForAgent = trips.some(
+-        (t) => t.status === "in_progress" && t.current_route_point_id === p.id,
+-      );
+-      addMarker(
+-        { lat: p.lat, lng: p.lng },
+-        `Stop ${p.sequence}: ${p.name}${isCurrentForAgent ? " (agent here now)" : ""}`,
+-        dot(isCurrentForAgent ? "#ea580c" : "#94a3b8", isCurrentForAgent ? 10 : 8),
+-        isCurrentForAgent ? 8 : 2,
+-        { text: String(p.sequence), color: "#ffffff", fontSize: "10px", fontWeight: "700" },
+-      );
+-    }
+-
+-    for (const c of collections) {
+-      if (c.gps_lat == null || c.gps_lng == null) continue;
+-      const risky = Number(c.risk_score ?? 0) >= 40;
+-      addMarker(
+-        { lat: c.gps_lat, lng: c.gps_lng },
+-        `${c.farmers?.full_name ?? "Farmer"} · ${Number(c.quantity_litres).toFixed(1)} L`,
+-        dot(risky ? "#dc2626" : "#16a34a", 5),
+-      );
+-    }
+-
+-    shownAgents.forEach((agentId, i) => {
+-      const trail = trailsByAgent.get(agentId) ?? [];
+-      if (trail.length === 0) return;
+-      const color = TRAIL_COLORS[i % TRAIL_COLORS.length]!;
+-      if (trail.length > 1) {
+-        const line = new maps.Polyline({
+-          map,
+-          path: trail,
+-          strokeColor: color,
+-          strokeOpacity: 0.8,
+-          strokeWeight: 4,
+-        });
+-        overlaysRef.current.push(line);
+-        for (const p of trail) {
+-          bounds.extend(p);
+-          hasBounds = true;
+-        }
+-      }
+-      const trip = trips.find((t) => t.agent_id === agentId);
+-      addMarker(trail[trail.length - 1]!, trip?.agents?.full_name ?? "Agent", dot(color, 8), 10);
+-    });
+-
+-    if (directionsPolyline) {
+-      const path = decodePolyline(directionsPolyline);
+-      const line = new maps.Polyline({
+-        map,
+-        path,
+-        strokeColor: "#1d4ed8",
+-        strokeOpacity: 0.55,
+-        strokeWeight: 7,
+-      });
+-      overlaysRef.current.push(line);
+-      for (const p of path) {
+-        bounds.extend(p);
+-        hasBounds = true;
+-      }
+-    }
+-
+-    if (hasBounds) {
+-      map.fitBounds(bounds, 48);
+-      const listener = maps.event.addListenerOnce(map, "idle", () => {
+-        if ((map.getZoom() ?? 0) > 16) map.setZoom(16);
+-      });
+-      return () => maps.event.removeListener(listener);
+-    }
+-    return;
+-  }, [ready, centre, points, collections, trips, trailsByAgent, shownAgents, directionsPolyline]);
+-
+-  if (error) {
+-    return (
+-      <div className="flex h-[420px] items-center justify-center px-6 text-center text-sm text-muted-foreground lg:h-[560px]">
+-        {error}
+-      </div>
+-    );
+-  }
+-
+-  return <div ref={containerRef} className="h-[420px] w-full rounded-xl lg:h-[560px]" />;
+-}
++/// <reference types="google.maps" />
++import { useEffect, useMemo, useRef, useState } from "react";
++import { decodePolyline, loadGoogleMaps } from "@/lib/google-maps-loader";
++import type { LiveCollection, LivePing, LiveRoutePoint, LiveTrip } from "@/hooks/useLiveOps";
++
++export type MapProps = {
++  centre: { name: string; lat: number | null; lng: number | null } | null | undefined;
++  trips: LiveTrip[];
++  pings: LivePing[];
++  points: LiveRoutePoint[];
++  collections: LiveCollection[];
++  focusAgentId: string | null;
++  /** Encoded polyline of a computed driving route to overlay. */
++  directionsPolyline?: string | null;
++};
++
++const TRAIL_COLORS = ["#2563eb", "#0d9488", "#7c3aed", "#ea580c", "#be123c", "#0891b2"];
++const DEFAULT_CENTRE = { lat: 22.3072, lng: 73.1812 };
++
++function dotIcon(maps: typeof google.maps, color: string, scale: number, stroke = "#ffffff") {
++  return {
++    path: maps.SymbolPath.CIRCLE,
++    scale,
++    fillColor: color,
++    fillOpacity: 1,
++    strokeColor: stroke,
++    strokeWeight: 2,
++  };
++}
++
++export default function GoogleLiveMap({
++  centre,
++  trips,
++  pings,
++  points,
++  collections,
++  focusAgentId,
++  directionsPolyline,
++}: MapProps) {
++  const containerRef = useRef<HTMLDivElement | null>(null);
++  const mapRef = useRef<google.maps.Map | null>(null);
++  const infoRef = useRef<google.maps.InfoWindow | null>(null);
++  const [ready, setReady] = useState(false);
++  const [error, setError] = useState<string | null>(null);
++
++  // Overlays that only change on route/collection/direction updates — NOT
++  // on every GPS ping. Kept separate from the agent-marker refs below so a
++  // ping from one agent never touches stop pins, collection dots, etc.
++  const staticOverlaysRef = useRef<Array<google.maps.Marker | google.maps.Polyline>>([]);
++
++  // LIVE TRACKING PLAN — PHASE 4 (performance)
++  // "Do not cause the entire map to reload on every GPS update. Update
++  // only the required Agent state." — one marker + one trail polyline per
++  // shown agent, updated in place (setPosition/setPath) rather than
++  // destroyed and recreated whenever a ping for ANY agent arrives.
++  const agentOverlaysRef = useRef<
++    Map<string, { marker: google.maps.Marker; line: google.maps.Polyline }>
++  >(new Map());
++  const lastShownAgentsRef = useRef<string>("");
++
++  useEffect(() => {
++    let cancelled = false;
++    loadGoogleMaps()
++      .then((maps) => {
++        if (cancelled || !containerRef.current) return;
++        mapRef.current = new maps.Map(containerRef.current, {
++          center: DEFAULT_CENTRE,
++          zoom: 12,
++          mapTypeControl: false,
++          streetViewControl: false,
++          fullscreenControl: true,
++        });
++        infoRef.current = new maps.InfoWindow();
++        setReady(true);
++      })
++      .catch((e: Error) => !cancelled && setError(e.message));
++    return () => {
++      cancelled = true;
++    };
++  }, []);
++
++  const trailsByAgent = useMemo(() => {
++    const map = new Map<string, google.maps.LatLngLiteral[]>();
++    for (const p of pings) {
++      if (p.lat == null || p.lng == null) continue;
++      const list = map.get(p.agent_id) ?? [];
++      list.push({ lat: p.lat, lng: p.lng });
++      map.set(p.agent_id, list);
++    }
++    return map;
++  }, [pings]);
++
++  const shownAgents = useMemo(() => {
++    if (focusAgentId) return [focusAgentId];
++    return trips
++      .filter((t) => t.status === "in_progress")
++      .map((t) => t.agent_id)
++      .filter((id, i, arr) => arr.indexOf(id) === i);
++  }, [trips, focusAgentId]);
++
++  const bindInfoWindow = (
++    marker: google.maps.Marker,
++    map: google.maps.Map,
++    getTitle: () => string,
++  ) => {
++    marker.addListener("click", () => {
++      infoRef.current?.setContent(`<div style="font-size:13px">${getTitle()}</div>`);
++      infoRef.current?.open({ map, anchor: marker });
++    });
++  };
++
++  // Static overlays: centre pin, route stops, collection dots, directions
++  // polyline. Only rebuilt when THIS data changes — a GPS ping does not
++  // touch any of these.
++  useEffect(() => {
++    const map = mapRef.current;
++    const maps = typeof window !== "undefined" ? window.google?.maps : undefined;
++    if (!ready || !map || !maps) return;
++
++    for (const o of staticOverlaysRef.current) o.setMap(null);
++    staticOverlaysRef.current = [];
++
++    const bounds = new maps.LatLngBounds();
++    let hasBounds = false;
++
++    const addMarker = (
++      position: google.maps.LatLngLiteral,
++      title: string,
++      icon: google.maps.Symbol,
++      zIndex = 1,
++      label?: google.maps.MarkerLabel,
++    ) => {
++      const marker = new maps.Marker({ map, position, icon, title, zIndex, label: label ?? null });
++      bindInfoWindow(marker, map, () => title);
++      staticOverlaysRef.current.push(marker);
++      bounds.extend(position);
++      hasBounds = true;
++    };
++
++    if (centre?.lat != null && centre.lng != null) {
++      addMarker(
++        { lat: centre.lat, lng: centre.lng },
++        `${centre.name} (centre)`,
++        dotIcon(maps, "#0f172a", 9),
++        5,
++      );
++    }
++
++    for (const p of points) {
++      if (p.lat == null || p.lng == null) continue;
++      const isCurrentForAgent = trips.some(
++        (t) => t.status === "in_progress" && t.current_route_point_id === p.id,
++      );
++      addMarker(
++        { lat: p.lat, lng: p.lng },
++        `Stop ${p.sequence}: ${p.name}${isCurrentForAgent ? " (agent here now)" : ""}`,
++        dotIcon(maps, isCurrentForAgent ? "#ea580c" : "#94a3b8", isCurrentForAgent ? 10 : 8),
++        isCurrentForAgent ? 8 : 2,
++        { text: String(p.sequence), color: "#ffffff", fontSize: "10px", fontWeight: "700" },
++      );
++    }
++
++    for (const c of collections) {
++      if (c.gps_lat == null || c.gps_lng == null) continue;
++      const risky = Number(c.risk_score ?? 0) >= 40;
++      addMarker(
++        { lat: c.gps_lat, lng: c.gps_lng },
++        `${c.farmers?.full_name ?? "Farmer"} · ${Number(c.quantity_litres).toFixed(1)} L`,
++        dotIcon(maps, risky ? "#dc2626" : "#16a34a", 5),
++      );
++    }
++
++    if (directionsPolyline) {
++      const path = decodePolyline(directionsPolyline);
++      const line = new maps.Polyline({
++        map,
++        path,
++        strokeColor: "#1d4ed8",
++        strokeOpacity: 0.55,
++        strokeWeight: 7,
++      });
++      staticOverlaysRef.current.push(line);
++      for (const p of path) {
++        bounds.extend(p);
++        hasBounds = true;
++      }
++    }
++
++    if (hasBounds) map.fitBounds(bounds, 48);
++  }, [ready, centre, points, collections, trips, directionsPolyline]);
++
++  // Agent markers + trails: this is the effect that runs on every ping.
++  // Updates existing markers/polylines in place; only creates/destroys
++  // overlays when an agent actually starts/stops being shown.
++  useEffect(() => {
++    const map = mapRef.current;
++    const maps = typeof window !== "undefined" ? window.google?.maps : undefined;
++    if (!ready || !map || !maps) return;
++
++    const shownSet = new Set(shownAgents);
++    const store = agentOverlaysRef.current;
++
++    // Remove overlays for agents no longer shown (trip ended, focus changed away).
++    for (const [agentId, overlay] of store) {
++      if (!shownSet.has(agentId)) {
++        overlay.marker.setMap(null);
++        overlay.line.setMap(null);
++        store.delete(agentId);
++      }
++    }
++
++    let addedAny = false;
++    const bounds = new maps.LatLngBounds();
++    let hasBounds = false;
++
++    shownAgents.forEach((agentId, i) => {
++      const trail = trailsByAgent.get(agentId) ?? [];
++      if (trail.length === 0) return;
++      const color = TRAIL_COLORS[i % TRAIL_COLORS.length]!;
++      const position = trail[trail.length - 1]!;
++      const trip = trips.find((t) => t.agent_id === agentId);
++      const title = trip?.agents?.full_name ?? "Agent";
++
++      let overlay = store.get(agentId);
++      if (!overlay) {
++        const marker = new maps.Marker({
++          map,
++          position,
++          icon: dotIcon(maps, color, 8),
++          title,
++          zIndex: 10,
++        });
++        bindInfoWindow(marker, map, () => title);
++        const line = new maps.Polyline({
++          map,
++          path: trail,
++          strokeColor: color,
++          strokeOpacity: 0.8,
++          strokeWeight: 4,
++        });
++        overlay = { marker, line };
++        store.set(agentId, overlay);
++        addedAny = true;
++      } else {
++        // In-place update — no marker/polyline recreation, no flicker.
++        overlay.marker.setPosition(position);
++        overlay.marker.setTitle(title);
++        overlay.line.setPath(trail);
++      }
++      for (const p of trail) {
++        bounds.extend(p);
++        hasBounds = true;
++      }
++    });
++
++    // Only re-fit the viewport when the set of shown agents actually
++    // changed (focus toggled, a trip started/ended) — not on every
++    // position tick, which would otherwise re-centre/re-zoom the map out
++    // from under someone watching it.
++    const shownKey = [...shownSet].sort().join(",");
++    if ((addedAny || shownKey !== lastShownAgentsRef.current) && hasBounds) {
++      map.fitBounds(bounds, 48);
++      const listener = maps.event.addListenerOnce(map, "idle", () => {
++        if ((map.getZoom() ?? 0) > 16) map.setZoom(16);
++      });
++      lastShownAgentsRef.current = shownKey;
++      return () => maps.event.removeListener(listener);
++    }
++    lastShownAgentsRef.current = shownKey;
++    return;
++  }, [ready, trailsByAgent, shownAgents, trips]);
++
++  if (error) {
++    return (
++      <div className="flex h-[420px] items-center justify-center px-6 text-center text-sm text-muted-foreground lg:h-[560px]">
++        {error}
++      </div>
++    );
++  }
++
++  return <div ref={containerRef} className="h-[420px] w-full rounded-xl lg:h-[560px]" />;
++}
+diff --git a/src/hooks/useActiveTrackingSession.ts b/src/hooks/useActiveTrackingSession.ts
+new file mode 100644
+index 0000000..87aed86
+--- /dev/null
++++ b/src/hooks/useActiveTrackingSession.ts
+@@ -0,0 +1,38 @@
++import { useQuery } from "@tanstack/react-query";
++import { supabase } from "@/integrations/supabase/client";
++
++/**
++ * LIVE TRACKING PLAN — PHASE 3
++ *
++ * `useTrackingSession` (Phase 2) owns *creating and transitioning* a
++ * tracking session, but it holds sessionId in local component state, which
++ * only exists on agent.tsx (where Punch In happens). trip.tsx and
++ * route-marking.tsx are separate route components that mount later/fresh —
++ * they have no way to see that state.
++ *
++ * This hook independently resolves "the session Punch In already created
++ * for this agent today" from the database, so continuous GPS (Phase 3) can
++ * be linked to the right tracking_session_id from any page, and so pings
++ * can start flowing as soon as the session is ACTIVE — not only once a
++ * trip exists.
++ */
++export function useActiveTrackingSession(agentId: string | null | undefined) {
++  return useQuery({
++    queryKey: ["active-tracking-session", agentId],
++    enabled: Boolean(agentId),
++    // Cheap row, changes rarely relative to how often callers re-render —
++    // avoid hammering it, but don't go stale for the whole session either.
++    staleTime: 15_000,
++    queryFn: async () => {
++      const { data } = await supabase
++        .from("tracking_sessions")
++        .select("id, status")
++        .eq("agent_id", agentId as string)
++        .in("status", ["NOT_STARTED", "ACTIVE", "DEGRADED"])
++        .order("created_at", { ascending: false })
++        .limit(1)
++        .maybeSingle();
++      return data;
++    },
++  });
++}
+diff --git a/src/hooks/useLiveLocation.ts b/src/hooks/useLiveLocation.ts
+index a57774b..a2f81bf 100644
+--- a/src/hooks/useLiveLocation.ts
++++ b/src/hooks/useLiveLocation.ts
+@@ -1,94 +1,163 @@
+-import { useEffect, useRef, useState } from "react";
+-import { supabase } from "@/integrations/supabase/client";
+-
+-export type LiveCoords = {
+-  lat: number;
+-  lng: number;
+-  accuracy: number | null;
+-  heading: number | null;
+-  speed: number | null;
+-};
+-
+-const MIN_PING_INTERVAL_MS = 15_000;
+-const MIN_MOVE_METERS = 25;
+-
+-function haversineMeters(a: LiveCoords, b: { lat: number; lng: number }) {
+-  const R = 6371000;
+-  const toRad = (d: number) => (d * Math.PI) / 180;
+-  const dLat = toRad(b.lat - a.lat);
+-  const dLng = toRad(b.lng - a.lng);
+-  const s =
+-    Math.sin(dLat / 2) ** 2 +
+-    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+-  return 2 * R * Math.asin(Math.sqrt(s));
+-}
+-
+-/**
+- * Continuously tracks the agent's device location while a trip is active
+- * (like a delivery partner app), writing throttled breadcrumbs to
+- * `gps_pings` so the manager's live map updates in near real time, while
+- * returning the freshest coords locally for in-app route/ETA rendering.
+- */
+-export function useLiveLocation(params: {
+-  enabled: boolean;
+-  tripId: string | null;
+-  agentId: string | null;
+-  mccId: string | null;
+-  routePointId?: string | null;
+-}) {
+-  const { enabled, tripId, agentId, mccId, routePointId } = params;
+-  const [coords, setCoords] = useState<LiveCoords | null>(null);
+-  const [permissionDenied, setPermissionDenied] = useState(false);
+-  const lastSentRef = useRef<{ at: number; coords: LiveCoords } | null>(null);
+-  const watchIdRef = useRef<number | null>(null);
+-
+-  useEffect(() => {
+-    if (!enabled || typeof navigator === "undefined" || !navigator.geolocation) return;
+-
+-    const handlePosition = (position: GeolocationPosition) => {
+-      const next: LiveCoords = {
+-        lat: position.coords.latitude,
+-        lng: position.coords.longitude,
+-        accuracy: position.coords.accuracy ?? null,
+-        heading: position.coords.heading ?? null,
+-        speed: position.coords.speed ?? null,
+-      };
+-      setCoords(next);
+-
+-      const now = Date.now();
+-      const last = lastSentRef.current;
+-      const movedEnough = !last || haversineMeters(last.coords, next) >= MIN_MOVE_METERS;
+-      const timeElapsed = !last || now - last.at >= MIN_PING_INTERVAL_MS;
+-      if (!agentId || !mccId || (!movedEnough && !timeElapsed)) return;
+-
+-      lastSentRef.current = { at: now, coords: next };
+-      void supabase.from("gps_pings").insert({
+-        trip_id: tripId,
+-        agent_id: agentId,
+-        mcc_id: mccId,
+-        route_point_id: routePointId ?? null,
+-        event_type: "ping",
+-        lat: next.lat,
+-        lng: next.lng,
+-        accuracy: next.accuracy,
+-      });
+-    };
+-
+-    const handleError = (err: GeolocationPositionError) => {
+-      if (err.code === err.PERMISSION_DENIED) setPermissionDenied(true);
+-    };
+-
+-    watchIdRef.current = navigator.geolocation.watchPosition(handlePosition, handleError, {
+-      enableHighAccuracy: true,
+-      maximumAge: 5_000,
+-      timeout: 20_000,
+-    });
+-
+-    return () => {
+-      if (watchIdRef.current != null) navigator.geolocation.clearWatch(watchIdRef.current);
+-      watchIdRef.current = null;
+-    };
+-  }, [enabled, tripId, agentId, mccId, routePointId]);
+-
+-  return { coords, permissionDenied };
+-}
++import { useEffect, useRef, useState } from "react";
++import { supabase } from "@/integrations/supabase/client";
++import {
++  classifyQuality,
++  getBatteryLevel,
++  nextSampleIntervalMs,
++  type FixQuality,
++} from "@/lib/tracking-quality";
++
++export type LiveCoords = {
++  lat: number;
++  lng: number;
++  accuracy: number | null;
++  heading: number | null;
++  speed: number | null;
++  quality: FixQuality;
++};
++
++function haversineMeters(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
++  const R = 6371000;
++  const toRad = (d: number) => (d * Math.PI) / 180;
++  const dLat = toRad(b.lat - a.lat);
++  const dLng = toRad(b.lng - a.lng);
++  const s =
++    Math.sin(dLat / 2) ** 2 +
++    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
++  return 2 * R * Math.asin(Math.sqrt(s));
++}
++
++/** m/s (what the Geolocation API gives us) → km/h. */
++function speedToKmh(speedMs: number | null): number | null {
++  return speedMs == null ? null : speedMs * 3.6;
++}
++
++/**
++ * LIVE TRACKING PLAN — PHASE 3: Continuous GPS + Location Storage
++ *
++ * Continuously watches the device position (like a delivery-partner app)
++ * whenever `enabled`, writing breadcrumbs to `gps_pings` so the manager's
++ * live map (Phase 4) updates in near real time, while returning the
++ * freshest coords locally for in-app route/ETA rendering.
++ *
++ * What changed from the pre-Phase-3 version:
++ *  - Sampling is adaptive (`nextSampleIntervalMs`) instead of a flat
++ *    15s/25m throttle: tighter while moving, backed off while stationary,
++ *    weak-signal, offline, or on low battery.
++ *  - Every fix is classified `good` | `weak` | `stale` and stored as such
++ *    (never silently treated as exact) — see tracking-quality.ts.
++ *  - Writes now carry `tracking_session_id` (so tracking starts at Punch
++ *    In per Phase 2, not only once a trip exists) alongside the existing
++ *    `trip_id`, plus heading/altitude, and a client-generated `client_id`
++ *    so a duplicate watchPosition fire or retry can never double-insert.
++ *
++ * Still direct/online writes — the local retry queue + "Pending
++ * Sync"/"Sync Failed" states are Phase 8 scope; a write that fails here
++ * today is simply skipped (never queued yet, never faked as sent).
++ */
++export function useLiveLocation(params: {
++  enabled: boolean;
++  tripId: string | null;
++  trackingSessionId: string | null;
++  agentId: string | null;
++  mccId: string | null;
++  routePointId?: string | null;
++}) {
++  const { enabled, tripId, trackingSessionId, agentId, mccId, routePointId } = params;
++  const [coords, setCoords] = useState<LiveCoords | null>(null);
++  const [permissionDenied, setPermissionDenied] = useState(false);
++  const lastSentRef = useRef<{ at: number; coords: { lat: number; lng: number } } | null>(null);
++  const batteryRef = useRef<number | null>(null);
++  const watchIdRef = useRef<number | null>(null);
++
++  useEffect(() => {
++    if (!enabled || typeof navigator === "undefined" || !navigator.geolocation) return;
++
++    let cancelled = false;
++    void getBatteryLevel().then((level) => {
++      if (!cancelled) batteryRef.current = level;
++    });
++    // Battery level can change materially over a multi-hour shift; refresh
++    // occasionally rather than trusting the value read at mount forever.
++    const batteryPoll = setInterval(() => {
++      void getBatteryLevel().then((level) => {
++        if (!cancelled) batteryRef.current = level;
++      });
++    }, 5 * 60_000);
++
++    const handlePosition = (position: GeolocationPosition) => {
++      const ageMs = Math.max(0, Date.now() - position.timestamp);
++      const quality = classifyQuality(position.coords.accuracy ?? null, ageMs);
++      const next: LiveCoords = {
++        lat: position.coords.latitude,
++        lng: position.coords.longitude,
++        accuracy: position.coords.accuracy ?? null,
++        heading: position.coords.heading ?? null,
++        speed: position.coords.speed ?? null,
++        quality,
++      };
++      setCoords(next);
++
++      // Always update local state (for in-app ETA/map) even for stale/weak
++      // fixes, but decide independently whether THIS fix is worth writing.
++      const now = Date.now();
++      const last = lastSentRef.current;
++      const distanceSinceLastM = last ? haversineMeters(last.coords, next) : Infinity;
++      const dueByInterval =
++        !last ||
++        now - last.at >=
++          nextSampleIntervalMs({
++            distanceSinceLastM,
++            speedKmh: speedToKmh(next.speed),
++            quality,
++            online: typeof navigator !== "undefined" ? navigator.onLine : true,
++            batteryLevel: batteryRef.current,
++          });
++
++      if (!agentId || !mccId || !dueByInterval) return;
++
++      lastSentRef.current = { at: now, coords: { lat: next.lat, lng: next.lng } };
++      const clientId =
++        typeof crypto !== "undefined" && "randomUUID" in crypto
++          ? crypto.randomUUID()
++          : `${agentId}-${now}-${Math.random()}`;
++
++      void supabase.from("gps_pings").insert({
++        trip_id: tripId,
++        tracking_session_id: trackingSessionId,
++        agent_id: agentId,
++        mcc_id: mccId,
++        route_point_id: routePointId ?? null,
++        event_type: "ping",
++        lat: next.lat,
++        lng: next.lng,
++        accuracy: next.accuracy,
++        heading: next.heading,
++        altitude: position.coords.altitude ?? null,
++        speed_kmh: speedToKmh(next.speed),
++        quality: next.quality,
++        client_id: clientId,
++        recorded_at: new Date(position.timestamp).toISOString(),
++      });
++    };
++
++    const handleError = (err: GeolocationPositionError) => {
++      if (err.code === err.PERMISSION_DENIED) setPermissionDenied(true);
++    };
++
++    watchIdRef.current = navigator.geolocation.watchPosition(handlePosition, handleError, {
++      enableHighAccuracy: true,
++      maximumAge: 5_000,
++      timeout: 20_000,
++    });
++
++    return () => {
++      cancelled = true;
++      clearInterval(batteryPoll);
++      if (watchIdRef.current != null) navigator.geolocation.clearWatch(watchIdRef.current);
++      watchIdRef.current = null;
++    };
++  }, [enabled, tripId, trackingSessionId, agentId, mccId, routePointId]);
++
++  return { coords, permissionDenied };
++}
+diff --git a/src/hooks/useLiveOps.ts b/src/hooks/useLiveOps.ts
+index 7adbb24..d4a5359 100644
+--- a/src/hooks/useLiveOps.ts
++++ b/src/hooks/useLiveOps.ts
+@@ -1,183 +1,255 @@
+-import { useEffect } from "react";
+-import { useQuery, useQueryClient } from "@tanstack/react-query";
+-import { supabase } from "@/integrations/supabase/client";
+-
+-export type LiveTrip = {
+-  id: string;
+-  status: string;
+-  session: string;
+-  started_at: string | null;
+-  ended_at: string | null;
+-  route_id: string;
+-  agent_id: string;
+-  current_route_point_id: string | null;
+-  agents: { full_name: string; employee_code: string } | null;
+-  routes: { name: string } | null;
+-};
+-
+-export type LivePing = {
+-  id: string;
+-  agent_id: string;
+-  trip_id: string | null;
+-  event_type: string;
+-  lat: number | null;
+-  lng: number | null;
+-  recorded_at: string;
+-};
+-
+-export type LiveCollection = {
+-  id: string;
+-  quantity_litres: number;
+-  total_amount: number;
+-  status: string;
+-  collected_at: string;
+-  risk_score: number | null;
+-  gps_lat: number | null;
+-  gps_lng: number | null;
+-  farmers: { full_name: string; farmer_code: string } | null;
+-  agents: { full_name: string } | null;
+-};
+-
+-export type LiveRoutePoint = {
+-  id: string;
+-  route_id: string;
+-  name: string;
+-  sequence: number;
+-  lat: number | null;
+-  lng: number | null;
+-};
+-
+-function startOfToday() {
+-  const d = new Date();
+-  d.setHours(0, 0, 0, 0);
+-  return d.toISOString();
+-}
+-
+-/** Today's trips for a centre, newest first. */
+-export function useLiveTrips(mccId: string | undefined) {
+-  return useQuery<LiveTrip[]>({
+-    queryKey: ["live-trips", mccId],
+-    enabled: Boolean(mccId),
+-    refetchInterval: 30_000,
+-    queryFn: async () => {
+-      const { data } = await supabase
+-        .from("route_trips")
+-        .select(
+-          "id, status, session, started_at, ended_at, route_id, agent_id, current_route_point_id, agents(full_name, employee_code), routes(name)",
+-        )
+-        .eq("mcc_id", mccId!)
+-        .gte("created_at", startOfToday())
+-        .order("created_at", { ascending: false });
+-      return (data ?? []) as unknown as LiveTrip[];
+-    },
+-  });
+-}
+-
+-/** Today's GPS breadcrumbs for a centre. */
+-export function useLivePings(mccId: string | undefined) {
+-  return useQuery<LivePing[]>({
+-    queryKey: ["live-pings", mccId],
+-    enabled: Boolean(mccId),
+-    refetchInterval: 20_000,
+-    queryFn: async () => {
+-      const { data } = await supabase
+-        .from("gps_pings")
+-        .select("id, agent_id, trip_id, event_type, lat, lng, recorded_at")
+-        .eq("mcc_id", mccId!)
+-        .gte("recorded_at", startOfToday())
+-        .order("recorded_at", { ascending: true })
+-        .limit(1000);
+-      return (data ?? []) as LivePing[];
+-    },
+-  });
+-}
+-
+-/** Today's collections feed for a centre. */
+-export function useLiveCollections(mccId: string | undefined) {
+-  return useQuery<LiveCollection[]>({
+-    queryKey: ["live-collections", mccId],
+-    enabled: Boolean(mccId),
+-    refetchInterval: 20_000,
+-    queryFn: async () => {
+-      const { data } = await supabase
+-        .from("milk_collections")
+-        .select(
+-          "id, quantity_litres, total_amount, status, collected_at, risk_score, gps_lat, gps_lng, farmers(full_name, farmer_code), agents(full_name)",
+-        )
+-        .eq("mcc_id", mccId!)
+-        .gte("collected_at", startOfToday())
+-        .order("collected_at", { ascending: false })
+-        .limit(60);
+-      return (data ?? []) as unknown as LiveCollection[];
+-    },
+-  });
+-}
+-
+-export function useRoutePoints(mccId: string | undefined) {
+-  return useQuery<LiveRoutePoint[]>({
+-    queryKey: ["live-route-points", mccId],
+-    enabled: Boolean(mccId),
+-    staleTime: 300_000,
+-    queryFn: async () => {
+-      const { data: routes } = await supabase
+-        .from("routes")
+-        .select("id")
+-        .eq("mcc_id", mccId!)
+-        .eq("active", true);
+-      const ids = (routes ?? []).map((r) => r.id);
+-      if (ids.length === 0) return [];
+-      const { data } = await supabase
+-        .from("route_points")
+-        .select("id, route_id, name, sequence, lat, lng")
+-        .in("route_id", ids)
+-        .order("sequence");
+-      return (data ?? []) as LiveRoutePoint[];
+-    },
+-  });
+-}
+-
+-export function useCentreLocation(mccId: string | undefined) {
+-  return useQuery({
+-    queryKey: ["centre-location", mccId],
+-    enabled: Boolean(mccId),
+-    staleTime: 300_000,
+-    queryFn: async () => {
+-      const { data } = await supabase
+-        .from("mcc_centres")
+-        .select("name, lat, lng")
+-        .eq("id", mccId!)
+-        .maybeSingle();
+-      return data;
+-    },
+-  });
+-}
+-
+-/** Refreshes live queries the moment a ping, trip change or collection lands. */
+-export function useLiveOpsRealtime(mccId: string | undefined) {
+-  const queryClient = useQueryClient();
+-  useEffect(() => {
+-    if (!mccId) return;
+-    const invalidate = (key: string) => void queryClient.invalidateQueries({ queryKey: [key] });
+-    const channel = supabase
+-      .channel(`live-ops-${mccId}`)
+-      .on(
+-        "postgres_changes",
+-        { event: "*", schema: "public", table: "gps_pings", filter: `mcc_id=eq.${mccId}` },
+-        () => invalidate("live-pings"),
+-      )
+-      .on(
+-        "postgres_changes",
+-        { event: "*", schema: "public", table: "route_trips", filter: `mcc_id=eq.${mccId}` },
+-        () => invalidate("live-trips"),
+-      )
+-      .on(
+-        "postgres_changes",
+-        { event: "*", schema: "public", table: "milk_collections", filter: `mcc_id=eq.${mccId}` },
+-        () => invalidate("live-collections"),
+-      )
+-      .subscribe();
+-    return () => {
+-      void supabase.removeChannel(channel);
+-    };
+-  }, [mccId, queryClient]);
+-}
++import { useEffect } from "react";
++import { useQuery, useQueryClient } from "@tanstack/react-query";
++import { supabase } from "@/integrations/supabase/client";
++
++export type LiveTrip = {
++  id: string;
++  status: string;
++  session: string;
++  started_at: string | null;
++  ended_at: string | null;
++  route_id: string;
++  agent_id: string;
++  current_route_point_id: string | null;
++  agents: { full_name: string; employee_code: string } | null;
++  routes: { name: string } | null;
++};
++
++export type LivePing = {
++  id: string;
++  agent_id: string;
++  trip_id: string | null;
++  event_type: string;
++  lat: number | null;
++  lng: number | null;
++  recorded_at: string;
++  speed_kmh: number | null;
++  accuracy: number | null;
++  quality: string | null;
++};
++
++export type LiveCollection = {
++  id: string;
++  quantity_litres: number;
++  total_amount: number;
++  status: string;
++  collected_at: string;
++  risk_score: number | null;
++  gps_lat: number | null;
++  gps_lng: number | null;
++  farmers: { full_name: string; farmer_code: string } | null;
++  agents: { full_name: string } | null;
++};
++
++export type LiveRoutePoint = {
++  id: string;
++  route_id: string;
++  name: string;
++  sequence: number;
++  lat: number | null;
++  lng: number | null;
++};
++
++export type LiveRoutePointFarmer = {
++  route_point_id: string;
++  farmer_id: string;
++  sequence: number;
++  full_name: string;
++};
++
++/** Farmers assigned to each stop, for the routes belonging to this centre — used by the Agent Detail panel's Current/Next farmer fields. */
++export function useRoutePointFarmers(mccId: string | undefined) {
++  return useQuery<LiveRoutePointFarmer[]>({
++    queryKey: ["live-route-point-farmers", mccId],
++    enabled: Boolean(mccId),
++    staleTime: 300_000,
++    queryFn: async () => {
++      const { data: routes } = await supabase
++        .from("routes")
++        .select("id")
++        .eq("mcc_id", mccId!)
++        .eq("active", true);
++      const routeIds = (routes ?? []).map((r) => r.id);
++      if (routeIds.length === 0) return [];
++      const { data: pointRows } = await supabase
++        .from("route_points")
++        .select("id, route_id")
++        .in("route_id", routeIds);
++      const pointIds = (pointRows ?? []).map((p) => p.id);
++      if (pointIds.length === 0) return [];
++      const { data } = await supabase
++        .from("route_point_farmers")
++        .select("route_point_id, farmer_id, sequence, farmers(full_name)")
++        .in("route_point_id", pointIds);
++      return (
++        (data ?? []) as unknown as Array<{
++          route_point_id: string;
++          farmer_id: string;
++          sequence: number;
++          farmers: { full_name: string } | null;
++        }>
++      ).map((r) => ({
++        route_point_id: r.route_point_id,
++        farmer_id: r.farmer_id,
++        sequence: r.sequence,
++        full_name: r.farmers?.full_name ?? "Farmer",
++      }));
++    },
++  });
++}
++
++function startOfToday() {
++  const d = new Date();
++  d.setHours(0, 0, 0, 0);
++  return d.toISOString();
++}
++
++/** Today's trips for a centre, newest first. */
++export function useLiveTrips(mccId: string | undefined) {
++  return useQuery<LiveTrip[]>({
++    queryKey: ["live-trips", mccId],
++    enabled: Boolean(mccId),
++    refetchInterval: 30_000,
++    queryFn: async () => {
++      const { data } = await supabase
++        .from("route_trips")
++        .select(
++          "id, status, session, started_at, ended_at, route_id, agent_id, current_route_point_id, agents(full_name, employee_code), routes(name)",
++        )
++        .eq("mcc_id", mccId!)
++        .gte("created_at", startOfToday())
++        .order("created_at", { ascending: false });
++      return (data ?? []) as unknown as LiveTrip[];
++    },
++  });
++}
++
++/** Today's GPS breadcrumbs for a centre. */
++export function useLivePings(mccId: string | undefined) {
++  return useQuery<LivePing[]>({
++    queryKey: ["live-pings", mccId],
++    enabled: Boolean(mccId),
++    refetchInterval: 20_000,
++    queryFn: async () => {
++      const { data } = await supabase
++        .from("gps_pings")
++        .select(
++          "id, agent_id, trip_id, event_type, lat, lng, recorded_at, speed_kmh, accuracy, quality",
++        )
++        .eq("mcc_id", mccId!)
++        .gte("recorded_at", startOfToday())
++        .order("recorded_at", { ascending: true })
++        .limit(1000);
++      return (data ?? []) as LivePing[];
++    },
++  });
++}
++
++/** Today's collections feed for a centre. */
++export function useLiveCollections(mccId: string | undefined) {
++  return useQuery<LiveCollection[]>({
++    queryKey: ["live-collections", mccId],
++    enabled: Boolean(mccId),
++    refetchInterval: 20_000,
++    queryFn: async () => {
++      const { data } = await supabase
++        .from("milk_collections")
++        .select(
++          "id, quantity_litres, total_amount, status, collected_at, risk_score, gps_lat, gps_lng, farmers(full_name, farmer_code), agents(full_name)",
++        )
++        .eq("mcc_id", mccId!)
++        .gte("collected_at", startOfToday())
++        .order("collected_at", { ascending: false })
++        .limit(60);
++      return (data ?? []) as unknown as LiveCollection[];
++    },
++  });
++}
++
++export function useRoutePoints(mccId: string | undefined) {
++  return useQuery<LiveRoutePoint[]>({
++    queryKey: ["live-route-points", mccId],
++    enabled: Boolean(mccId),
++    staleTime: 300_000,
++    queryFn: async () => {
++      const { data: routes } = await supabase
++        .from("routes")
++        .select("id")
++        .eq("mcc_id", mccId!)
++        .eq("active", true);
++      const ids = (routes ?? []).map((r) => r.id);
++      if (ids.length === 0) return [];
++      const { data } = await supabase
++        .from("route_points")
++        .select("id, route_id, name, sequence, lat, lng")
++        .in("route_id", ids)
++        .order("sequence");
++      return (data ?? []) as LiveRoutePoint[];
++    },
++  });
++}
++
++export function useCentreLocation(mccId: string | undefined) {
++  return useQuery({
++    queryKey: ["centre-location", mccId],
++    enabled: Boolean(mccId),
++    staleTime: 300_000,
++    queryFn: async () => {
++      const { data } = await supabase
++        .from("mcc_centres")
++        .select("name, lat, lng")
++        .eq("id", mccId!)
++        .maybeSingle();
++      return data;
++    },
++  });
++}
++
++/**
++ * LIVE TRACKING PLAN — PHASE 4
++ *
++ * Refreshes live queries as data changes. GPS pings are by far the highest-
++ * frequency event here (one every ~10-45s per active agent, per Phase 3's
++ * adaptive sampling) — invalidating the whole `live-pings` query on every
++ * single insert would refetch up to 1000 rows and force the map to rebuild
++ * every marker/trail/bounds on every tick ("Do not cause the entire map to
++ * reload on every GPS update"). Instead, splice just the new row into the
++ * existing cached array. Trips and collections are much lower-frequency
++ * (a handful of events/day, not one every few seconds), so a plain
++ * invalidate for those is cheap enough and keeps that code simple.
++ */
++export function useLiveOpsRealtime(mccId: string | undefined) {
++  const queryClient = useQueryClient();
++  useEffect(() => {
++    if (!mccId) return;
++    const invalidate = (key: string) => void queryClient.invalidateQueries({ queryKey: [key] });
++    const channel = supabase
++      .channel(`live-ops-${mccId}`)
++      .on(
++        "postgres_changes",
++        { event: "INSERT", schema: "public", table: "gps_pings", filter: `mcc_id=eq.${mccId}` },
++        (payload) => {
++          const row = payload.new as LivePing;
++          queryClient.setQueryData<LivePing[]>(["live-pings", mccId], (prev) => {
++            if (!prev) return prev;
++            if (prev.some((p) => p.id === row.id)) return prev; // already have it (e.g. own optimistic insert)
++            return [...prev, row];
++          });
++        },
++      )
++      .on(
++        "postgres_changes",
++        { event: "*", schema: "public", table: "route_trips", filter: `mcc_id=eq.${mccId}` },
++        () => invalidate("live-trips"),
++      )
++      .on(
++        "postgres_changes",
++        { event: "*", schema: "public", table: "milk_collections", filter: `mcc_id=eq.${mccId}` },
++        () => invalidate("live-collections"),
++      )
++      .subscribe();
++    return () => {
++      void supabase.removeChannel(channel);
++    };
++  }, [mccId, queryClient]);
++}
+diff --git a/src/integrations/supabase/types.ts b/src/integrations/supabase/types.ts
+index 687d640..a7150d2 100644
+--- a/src/integrations/supabase/types.ts
++++ b/src/integrations/supabase/types.ts
+@@ -406,43 +406,64 @@ export type Database = {
+         Row: {
+           accuracy: number | null
+           agent_id: string
++          altitude: number | null
++          client_id: string | null
+           event_type: string
+           halt_seconds: number | null
++          heading: number | null
+           id: string
+           lat: number | null
+           lng: number | null
+           mcc_id: string
++          quality: string | null
+           recorded_at: string
+           route_point_id: string | null
+           speed_kmh: number | null
++          sync_state: string
++          synced_at: string
++          tracking_session_id: string | null
+           trip_id: string | null
+         }
+         Insert: {
+           accuracy?: number | null
+           agent_id: string
++          altitude?: number | null
++          client_id?: string | null
+           event_type?: string
+           halt_seconds?: number | null
++          heading?: number | null
+           id?: string
+           lat?: number | null
+           lng?: number | null
+           mcc_id: string
++          quality?: string | null
+           recorded_at?: string
+           route_point_id?: string | null
+           speed_kmh?: number | null
++          sync_state?: string
++          synced_at?: string
++          tracking_session_id?: string | null
+           trip_id?: string | null
+         }
+         Update: {
+           accuracy?: number | null
+           agent_id?: string
++          altitude?: number | null
++          client_id?: string | null
+           event_type?: string
+           halt_seconds?: number | null
++          heading?: number | null
+           id?: string
+           lat?: number | null
+           lng?: number | null
+           mcc_id?: string
++          quality?: string | null
+           recorded_at?: string
+           route_point_id?: string | null
+           speed_kmh?: number | null
++          sync_state?: string
++          synced_at?: string
++          tracking_session_id?: string | null
+           trip_id?: string | null
+         }
+         Relationships: [
+@@ -450,6 +471,7 @@ export type Database = {
+           { foreignKeyName: "gps_pings_mcc_id_fkey"; columns: ["mcc_id"]; isOneToOne: false; referencedRelation: "mcc_centres"; referencedColumns: ["id"] },
+           { foreignKeyName: "gps_pings_route_point_id_fkey"; columns: ["route_point_id"]; isOneToOne: false; referencedRelation: "route_points"; referencedColumns: ["id"] },
+           { foreignKeyName: "gps_pings_trip_id_fkey"; columns: ["trip_id"]; isOneToOne: false; referencedRelation: "route_trips"; referencedColumns: ["id"] },
++          { foreignKeyName: "gps_pings_tracking_session_id_fkey"; columns: ["tracking_session_id"]; isOneToOne: false; referencedRelation: "tracking_sessions"; referencedColumns: ["id"] },
+         ]
+       }
+       ledger_entries: {
+diff --git a/src/lib/tracking-quality.ts b/src/lib/tracking-quality.ts
+new file mode 100644
+index 0000000..2bdf02e
+--- /dev/null
++++ b/src/lib/tracking-quality.ts
+@@ -0,0 +1,140 @@
++/**
++ * LIVE TRACKING PLAN — PHASE 3
++ *
++ * Pure helpers for two things gps_pings/useLiveLocation need and neither
++ * had before Phase 3:
++ *
++ *  1. Classifying how much to trust a given GPS fix (`classifyQuality`).
++ *  2. Deciding how long to wait before the *next* fix is worth writing
++ *     (`nextSampleIntervalMs`) — "adaptive tracking": frequent while
++ *     moving, backed off while stationary, and further backed off when the
++ *     signal is poor or the battery is low.
++ *
++ * Kept dependency-free and easily unit-testable — no supabase/browser APIs
++ * here, those live in useLiveLocation.ts.
++ */
++
++export type FixQuality = "good" | "weak" | "stale";
++
++/** A fix worse than this accuracy (metres) is still usable but flagged "weak". */
++export const WEAK_ACCURACY_M = 20;
++/** A fix worse than this accuracy is so poor it barely helps the map — still stored (never silently dropped), just classified accordingly. */
++export const POOR_ACCURACY_M = 75;
++/** A fix older than this by the time we're about to use it is "stale" — do not treat it as the agent's exact current position. */
++export const STALE_FIX_MS = 30_000;
++
++/**
++ * Classify a single fix. `ageMs` is how long ago the browser/OS actually
++ * captured it (Date.now() - position.timestamp), which can lag the "now"
++ * we're sampling at — e.g. a cached fix returned instantly by maximumAge.
++ */
++export function classifyQuality(accuracyM: number | null, ageMs: number): FixQuality {
++  if (ageMs > STALE_FIX_MS) return "stale";
++  if (accuracyM == null) return "weak"; // unknown accuracy: don't claim "good"
++  if (accuracyM <= WEAK_ACCURACY_M) return "good";
++  return "weak"; // includes accuracyM > POOR_ACCURACY_M — still real data, just untrustworthy for tight geofencing
++}
++
++export type SamplingInputs = {
++  /** Metres moved since the last *sent* sample. */
++  distanceSinceLastM: number;
++  /** Instantaneous speed from the fix, km/h, if the device reports one. */
++  speedKmh: number | null;
++  quality: FixQuality;
++  /** navigator.onLine — no point sampling aggressively if we can't ship it anyway. */
++  online: boolean;
++  /** 0–1 battery level if the Battery Status API is available, else null (treat as "unknown", not "low"). */
++  batteryLevel: number | null;
++};
++
++const MOVING_INTERVAL_MS = 10_000;
++const WALKING_INTERVAL_MS = 15_000;
++const STATIONARY_INTERVAL_MS = 45_000;
++const LOW_BATTERY_INTERVAL_MS = 90_000;
++const OFFLINE_INTERVAL_MS = 60_000; // still sample while offline (Phase 8 queues these), just less eagerly
++
++const LOW_BATTERY_THRESHOLD = 0.15;
++const MOVING_SPEED_KMH = 8; // roughly bike/vehicle pace
++const WALKING_SPEED_KMH = 2;
++const MOVING_DISTANCE_M = 30;
++const WALKING_DISTANCE_M = 8;
++
++/**
++ * How long to wait before the next sample is worth taking, in ms.
++ * "Use more frequent updates while moving. Reduce unnecessary updates
++ * while stationary." (Phase 3 spec) — plus battery/network/DB-load as
++ * secondary modifiers on top of the movement-driven base interval.
++ */
++export function nextSampleIntervalMs(inputs: SamplingInputs): number {
++  const { distanceSinceLastM, speedKmh, quality, online, batteryLevel } = inputs;
++
++  const isMoving =
++    (speedKmh != null && speedKmh >= MOVING_SPEED_KMH) || distanceSinceLastM >= MOVING_DISTANCE_M;
++  const isWalking =
++    !isMoving &&
++    ((speedKmh != null && speedKmh >= WALKING_SPEED_KMH) ||
++      distanceSinceLastM >= WALKING_DISTANCE_M);
++
++  let base = isMoving
++    ? MOVING_INTERVAL_MS
++    : isWalking
++      ? WALKING_INTERVAL_MS
++      : STATIONARY_INTERVAL_MS;
++
++  // A weak/stale fix won't get more trustworthy by asking again in 10s —
++  // back off a bit so we're not just filling the DB with noisy points.
++  if (quality !== "good") base = Math.max(base, WALKING_INTERVAL_MS);
++
++  if (!online) base = Math.max(base, OFFLINE_INTERVAL_MS);
++  if (batteryLevel != null && batteryLevel <= LOW_BATTERY_THRESHOLD) {
++    base = Math.max(base, LOW_BATTERY_INTERVAL_MS);
++  }
++
++  return base;
++}
++
++/** Best-effort battery level via the (non-standard, Chromium-only) Battery Status API. Resolves null everywhere else — callers must treat null as "unknown", not "low". */
++export async function getBatteryLevel(): Promise<number | null> {
++  try {
++    const nav = navigator as Navigator & { getBattery?: () => Promise<{ level: number }> };
++    if (typeof nav.getBattery !== "function") return null;
++    const battery = await nav.getBattery();
++    return typeof battery.level === "number" ? battery.level : null;
++  } catch {
++    return null;
++  }
++}
++
++/**
++ * LIVE TRACKING PLAN — PHASE 4
++ *
++ * "Never fake LIVE status" — a manager's live map must say LIVE only while
++ * data is actually fresh, and switch to a labelled STALE state (with the
++ * real elapsed time) the moment it isn't, rather than leaving a marker
++ * looking live forever. Threshold is set just above the tightest adaptive
++ * sampling interval (Phase 3's MOVING_INTERVAL_MS = 10s) so a normal
++ * in-between-samples gap during active movement doesn't itself read STALE.
++ */
++export const LIVE_THRESHOLD_MS = 25_000;
++
++export type LiveStatus = { isLive: boolean; label: string };
++
++export function classifyLiveStatus(lastUpdateIso: string | null, nowMs = Date.now()): LiveStatus {
++  if (!lastUpdateIso) return { isLive: false, label: "No location yet" };
++  const ageMs = nowMs - new Date(lastUpdateIso).getTime();
++  if (ageMs < 0) return { isLive: true, label: "Updated just now" }; // clock skew guard
++  if (ageMs <= LIVE_THRESHOLD_MS) {
++    const secs = Math.round(ageMs / 1000);
++    return { isLive: true, label: secs < 5 ? "Updated just now" : `Updated ${secs} sec ago` };
++  }
++  const totalSecs = Math.floor(ageMs / 1000);
++  const mins = Math.floor(totalSecs / 60);
++  const secs = totalSecs % 60;
++  const label =
++    mins < 1
++      ? `Last update ${totalSecs}s ago`
++      : mins < 60
++        ? `Last update ${mins}m ${secs}s ago`
++        : `Last update ${Math.floor(mins / 60)}h ${mins % 60}m ago`;
++  return { isLive: false, label };
++}
+diff --git a/src/routes/_authenticated/agent.tsx b/src/routes/_authenticated/agent.tsx
+index a29bdfd..cbfb018 100644
+--- a/src/routes/_authenticated/agent.tsx
++++ b/src/routes/_authenticated/agent.tsx
+@@ -19,6 +19,8 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
+ import { useAgentContext } from "@/hooks/useAgentContext";
+ import { useOfflineQueue } from "@/hooks/useOfflineQueue";
+ import { useTrackingSession, TRACKING_FAILURE_MESSAGES } from "@/hooks/useTrackingSession";
++import { useActiveTrackingSession } from "@/hooks/useActiveTrackingSession";
++import { useLiveLocation } from "@/hooks/useLiveLocation";
+ import { getCoords } from "@/lib/geo";
+ import { formatCurrency } from "@/lib/pricing";
+ 
+@@ -54,6 +56,14 @@ function AgentHome() {
+   const navigate = useNavigate();
+   const { pending, online, flush } = useOfflineQueue();
+   const trackingSession = useTrackingSession();
++  // trackingSession.sessionId only exists in memory for the Punch In that
++  // just happened on this page load; useActiveTrackingSession re-resolves
++  // it from the DB so a reload mid-shift still finds the live session.
++  const { data: resumedSession } = useActiveTrackingSession(agent?.agentId ?? null);
++  const activeSessionId = trackingSession.sessionId ?? resumedSession?.id ?? null;
++  const activeSessionStatus = trackingSession.sessionId
++    ? trackingSession.status
++    : (resumedSession?.status ?? null);
+ 
+   const { data: attendance } = useQuery({
+     queryKey: ["attendance-today", agent?.agentId],
+@@ -91,6 +101,28 @@ function AgentHome() {
+     },
+   });
+ 
++  /*
++   * LIVE TRACKING PLAN — PHASE 3
++   *
++   * GPS collection begins the moment the tracking session goes ACTIVE
++   * (i.e. right after Punch In succeeds and a GPS fix is acquired) rather
++   * than waiting for "Start trip" — this closes the Phase 2→3 gap: Phase 2
++   * already models tracking as starting at Punch In, but nothing was
++   * writing gps_pings until a trip existed. trip.tsx/route-marking.tsx keep
++   * their own useLiveLocation calls running too (each supplies its own
++   * trip_id/route_point_id context); duplicate writes across mounted pages
++   * aren't a concern in practice since only one of these routes is ever
++   * mounted at a time.
++   */
++  useLiveLocation({
++    enabled: activeSessionStatus === "ACTIVE",
++    tripId: trip?.id ?? null,
++    trackingSessionId: activeSessionId,
++    agentId: agent?.agentId ?? null,
++    mccId: agent?.mccId ?? null,
++    routePointId: null,
++  });
++
+   const { data: totals } = useQuery({
+     queryKey: ["agent-today-totals", agent?.agentId],
+     enabled: Boolean(agent?.agentId),
+@@ -354,4 +386,4 @@ function AgentHome() {
+       )}
+     </AppShell>
+   );
+-}
+\ No newline at end of file
++}
+diff --git a/src/routes/_authenticated/live.tsx b/src/routes/_authenticated/live.tsx
+index e6aeb75..7a69368 100644
+--- a/src/routes/_authenticated/live.tsx
++++ b/src/routes/_authenticated/live.tsx
+@@ -1,271 +1,429 @@
+-import { Suspense, lazy, useMemo, useState } from "react";
+-import { createFileRoute } from "@tanstack/react-router";
+-import { Activity, MapPinned, Milk, Navigation, Users } from "lucide-react";
+-import { ClientOnly } from "@tanstack/react-router";
+-import { useQuery } from "@tanstack/react-query";
+-import { useServerFn } from "@tanstack/react-start";
+-import { AppShell, PageHeading, StatCard } from "@/components/app-shell";
+-import { Badge } from "@/components/ui/badge";
+-import { Button } from "@/components/ui/button";
+-import { useStaffMcc } from "@/hooks/useStaffMcc";
+-import {
+-  useCentreLocation,
+-  useLiveCollections,
+-  useLiveOpsRealtime,
+-  useLivePings,
+-  useLiveTrips,
+-  useRoutePoints,
+-} from "@/hooks/useLiveOps";
+-import { computeRoute } from "@/lib/maps.functions";
+-import { formatCurrency } from "@/lib/pricing";
+-import { MANAGER_NAV } from "@/lib/nav";
+-
+-const LiveMap = lazy(() => import("@/components/google-live-map"));
+-
+-export const Route = createFileRoute("/_authenticated/live")({
+-  head: () => ({
+-    meta: [
+-      { title: "Live operations map — DairyOne" },
+-      {
+-        name: "description",
+-        content:
+-          "Track every active collection agent, route-point progress and incoming milk entries live on one map.",
+-      },
+-      { property: "og:title", content: "Live operations map — DairyOne" },
+-      {
+-        property: "og:description",
+-        content: "Realtime agent GPS trails, trip status and collection feed for your centre.",
+-      },
+-      { property: "og:type", content: "website" },
+-      { name: "twitter:card", content: "summary_large_image" },
+-    ],
+-  }),
+-  component: LiveOpsScreen,
+-});
+-
+-function timeAgo(iso: string | null) {
+-  if (!iso) return "—";
+-  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+-  if (mins < 1) return "just now";
+-  if (mins < 60) return `${mins}m ago`;
+-  return `${Math.floor(mins / 60)}h ${mins % 60}m ago`;
+-}
+-
+-function LiveOpsScreen() {
+-  const { data: mcc } = useStaffMcc();
+-  const mccId = mcc?.mccId;
+-  const [focusAgentId, setFocusAgentId] = useState<string | null>(null);
+-
+-  useLiveOpsRealtime(mccId);
+-  const { data: trips } = useLiveTrips(mccId);
+-  const { data: pings } = useLivePings(mccId);
+-  const { data: points } = useRoutePoints(mccId);
+-  const { data: collections } = useLiveCollections(mccId);
+-  const { data: centre } = useCentreLocation(mccId);
+-
+-  const tripList = trips ?? [];
+-  const pingList = pings ?? [];
+-  const collectionList = collections ?? [];
+-  const active = tripList.filter((t) => t.status === "in_progress");
+-  const litres = collectionList.reduce((s, c) => s + Number(c.quantity_litres ?? 0), 0);
+-  const value = collectionList.reduce((s, c) => s + Number(c.total_amount ?? 0), 0);
+-
+-  const lastPingFor = (agentId: string) =>
+-    [...pingList].reverse().find((p) => p.agent_id === agentId) ?? null;
+-
+-  // Stops for the directions request: focused agent's route, else every active stop.
+-  const focusedRouteId = focusAgentId
+-    ? (tripList.find((t) => t.agent_id === focusAgentId)?.route_id ?? null)
+-    : null;
+-
+-  const [showDirections, setShowDirections] = useState(false);
+-  const routeStops = useMemo(() => {
+-    const list = (points ?? [])
+-      .filter((p) => p.lat != null && p.lng != null)
+-      .filter((p) => (focusedRouteId ? p.route_id === focusedRouteId : true))
+-      .sort((a, b) => a.sequence - b.sequence)
+-      .map((p) => ({ lat: p.lat!, lng: p.lng! }));
+-    return list.slice(0, 25);
+-  }, [points, focusedRouteId]);
+-
+-  const startPoint =
+-    centre?.lat != null && centre.lng != null
+-      ? { lat: centre.lat, lng: centre.lng }
+-      : (routeStops[0] ?? null);
+-
+-  const runComputeRoute = useServerFn(computeRoute);
+-  const directions = useQuery({
+-    queryKey: ["directions", focusedRouteId, routeStops.length, startPoint?.lat, startPoint?.lng],
+-    enabled: showDirections && Boolean(startPoint) && routeStops.length > 0,
+-    staleTime: 300_000,
+-    retry: false,
+-    queryFn: () =>
+-      runComputeRoute({
+-        data: {
+-          origin: startPoint!,
+-          destination: routeStops[routeStops.length - 1]!,
+-          waypoints: routeStops.slice(0, -1),
+-        },
+-      }),
+-  });
+-
+-  const km = directions.data ? (directions.data.distanceMeters / 1000).toFixed(1) : null;
+-  const mins = directions.data ? Math.round(directions.data.durationSeconds / 60) : null;
+-
+-
+-  return (
+-    <AppShell nav={MANAGER_NAV}>
+-      <PageHeading
+-        title="Live operations"
+-        subtitle={
+-          mcc
+-            ? `${mcc.name} · ${mcc.code} — agent positions and collections update in realtime.`
+-            : "No collection centre assigned to you yet."
+-        }
+-      />
+-
+-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+-        <StatCard label="Agents on route" value={active.length} icon={<Users className="h-4 w-4" />} />
+-        <StatCard label="GPS pings today" value={pingList.length} icon={<Activity className="h-4 w-4" />} />
+-        <StatCard label="Litres collected" value={litres.toFixed(1)} icon={<Milk className="h-4 w-4" />} />
+-        <StatCard label="Value today" value={formatCurrency(value)} />
+-      </div>
+-
+-      <div className="mt-4 grid gap-4 lg:grid-cols-[2fr_1fr]">
+-        <div className="surface-card overflow-hidden p-2">
+-          <div className="flex flex-wrap items-center justify-between gap-2 px-2 pb-2 pt-1">
+-            <p className="text-sm text-muted-foreground">
+-              {focusedRouteId ? "Route for selected agent" : "All active route stops"} ·{" "}
+-              {routeStops.length} stops
+-            </p>
+-            <div className="flex items-center gap-2">
+-              {directions.data && (
+-                <Badge variant="secondary">
+-                  {km} km · {mins} min drive
+-                </Badge>
+-              )}
+-              <Button
+-                size="sm"
+-                variant={showDirections ? "default" : "outline"}
+-                disabled={routeStops.length === 0}
+-                onClick={() => setShowDirections((v) => !v)}
+-              >
+-                <Navigation className="mr-1 h-4 w-4" />
+-                {showDirections ? "Hide directions" : "Show directions"}
+-              </Button>
+-            </div>
+-          </div>
+-          {showDirections && directions.isError && (
+-            <p className="px-2 pb-2 text-xs text-destructive">
+-              {(directions.error as Error).message}
+-            </p>
+-          )}
+-          <ClientOnly
+-            fallback={
+-              <div className="flex h-[420px] items-center justify-center text-sm text-muted-foreground lg:h-[560px]">
+-                Loading map…
+-              </div>
+-            }
+-          >
+-            <Suspense
+-              fallback={
+-                <div className="flex h-[420px] items-center justify-center text-sm text-muted-foreground lg:h-[560px]">
+-                  Loading map…
+-                </div>
+-              }
+-            >
+-              <LiveMap
+-                centre={centre ?? null}
+-                trips={tripList}
+-                pings={pingList}
+-                points={points ?? []}
+-                collections={collectionList}
+-                focusAgentId={focusAgentId}
+-                directionsPolyline={showDirections ? (directions.data?.polyline ?? null) : null}
+-              />
+-            </Suspense>
+-          </ClientOnly>
+-        </div>
+-
+-        <div className="space-y-4">
+-          <div className="surface-card p-4">
+-            <div className="mb-3 flex items-center justify-between">
+-              <h2 className="font-semibold">Agents today</h2>
+-              {focusAgentId && (
+-                <Button size="sm" variant="ghost" onClick={() => setFocusAgentId(null)}>
+-                  Show all
+-                </Button>
+-              )}
+-            </div>
+-            <ul className="space-y-2">
+-              {tripList.map((trip) => {
+-                const ping = lastPingFor(trip.agent_id);
+-                const stop = (points ?? []).find((p) => p.id === trip.current_route_point_id);
+-                return (
+-                  <li
+-                    key={trip.id}
+-                    className={`cursor-pointer rounded-lg border border-border p-3 transition-colors hover:bg-secondary ${
+-                      focusAgentId === trip.agent_id ? "bg-primary-soft" : ""
+-                    }`}
+-                    onClick={() =>
+-                      setFocusAgentId(focusAgentId === trip.agent_id ? null : trip.agent_id)
+-                    }
+-                  >
+-                    <div className="flex items-center justify-between gap-2">
+-                      <p className="font-medium">{trip.agents?.full_name ?? "Agent"}</p>
+-                      <Badge variant={trip.status === "in_progress" ? "default" : "secondary"}>
+-                        {trip.status === "in_progress" ? "On route" : trip.status}
+-                      </Badge>
+-                    </div>
+-                    <p className="mt-1 text-xs text-muted-foreground">
+-                      {trip.routes?.name ?? "Route"} · {trip.session} · started{" "}
+-                      {timeAgo(trip.started_at)}
+-                    </p>
+-                    <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+-                      <MapPinned className="h-3 w-3" />
+-                      {stop ? `At ${stop.name}` : "No stop marked"} · last ping{" "}
+-                      {timeAgo(ping?.recorded_at ?? null)}
+-                    </p>
+-                  </li>
+-                );
+-              })}
+-              {tripList.length === 0 && (
+-                <li className="py-8 text-center text-sm text-muted-foreground">
+-                  No trips started today.
+-                </li>
+-              )}
+-            </ul>
+-          </div>
+-
+-          <div className="surface-card p-4">
+-            <h2 className="mb-3 font-semibold">Live collection feed</h2>
+-            <ul className="max-h-80 space-y-2 overflow-y-auto">
+-              {collectionList.slice(0, 25).map((c) => (
+-                <li key={c.id} className="flex items-center justify-between gap-3 text-sm">
+-                  <div>
+-                    <p className="font-medium">{c.farmers?.full_name ?? "Farmer"}</p>
+-                    <p className="text-xs text-muted-foreground">
+-                      {c.agents?.full_name ?? "Centre"} · {timeAgo(c.collected_at)}
+-                    </p>
+-                  </div>
+-                  <div className="text-right">
+-                    <p className="font-semibold">{Number(c.quantity_litres).toFixed(1)} L</p>
+-                    <p className="text-xs text-muted-foreground">
+-                      {formatCurrency(Number(c.total_amount ?? 0))}
+-                    </p>
+-                  </div>
+-                  {Number(c.risk_score ?? 0) >= 40 && <Badge variant="destructive">Suspect</Badge>}
+-                </li>
+-              ))}
+-              {collectionList.length === 0 && (
+-                <li className="py-8 text-center text-sm text-muted-foreground">
+-                  No collections recorded today yet.
+-                </li>
+-              )}
+-            </ul>
+-          </div>
+-        </div>
+-      </div>
+-    </AppShell>
+-  );
+-}
++import { Suspense, lazy, useMemo, useState } from "react";
++import { createFileRoute } from "@tanstack/react-router";
++import { Activity, Gauge, MapPinned, Milk, Navigation, Radio, Users } from "lucide-react";
++import { ClientOnly } from "@tanstack/react-router";
++import { useQuery } from "@tanstack/react-query";
++import { useServerFn } from "@tanstack/react-start";
++import { AppShell, PageHeading, StatCard } from "@/components/app-shell";
++import { Badge } from "@/components/ui/badge";
++import { Button } from "@/components/ui/button";
++import { useStaffMcc } from "@/hooks/useStaffMcc";
++import {
++  useCentreLocation,
++  useLiveCollections,
++  useLiveOpsRealtime,
++  useLivePings,
++  useLiveTrips,
++  useRoutePointFarmers,
++  useRoutePoints,
++} from "@/hooks/useLiveOps";
++import { computeRoute } from "@/lib/maps.functions";
++import { formatCurrency } from "@/lib/pricing";
++import { MANAGER_NAV } from "@/lib/nav";
++import { haversineMeters } from "@/lib/geo";
++import { classifyLiveStatus } from "@/lib/tracking-quality";
++
++const LiveMap = lazy(() => import("@/components/google-live-map"));
++
++export const Route = createFileRoute("/_authenticated/live")({
++  head: () => ({
++    meta: [
++      { title: "Live operations map — DairyOne" },
++      {
++        name: "description",
++        content:
++          "Track every active collection agent, route-point progress and incoming milk entries live on one map.",
++      },
++      { property: "og:title", content: "Live operations map — DairyOne" },
++      {
++        property: "og:description",
++        content: "Realtime agent GPS trails, trip status and collection feed for your centre.",
++      },
++      { property: "og:type", content: "website" },
++      { name: "twitter:card", content: "summary_large_image" },
++    ],
++  }),
++  component: LiveOpsScreen,
++});
++
++function timeAgo(iso: string | null) {
++  if (!iso) return "—";
++  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
++  if (mins < 1) return "just now";
++  if (mins < 60) return `${mins}m ago`;
++  return `${Math.floor(mins / 60)}h ${mins % 60}m ago`;
++}
++
++function LiveOpsScreen() {
++  const { data: mcc } = useStaffMcc();
++  const mccId = mcc?.mccId;
++  const [focusAgentId, setFocusAgentId] = useState<string | null>(null);
++
++  useLiveOpsRealtime(mccId);
++  const { data: trips } = useLiveTrips(mccId);
++  const { data: pings } = useLivePings(mccId);
++  const { data: points } = useRoutePoints(mccId);
++  const { data: pointFarmers } = useRoutePointFarmers(mccId);
++  const { data: collections } = useLiveCollections(mccId);
++  const { data: centre } = useCentreLocation(mccId);
++
++  const tripList = trips ?? [];
++  const pingList = pings ?? [];
++  const collectionList = useMemo(() => collections ?? [], [collections]);
++  const active = tripList.filter((t) => t.status === "in_progress");
++  const litres = collectionList.reduce((s, c) => s + Number(c.quantity_litres ?? 0), 0);
++  const value = collectionList.reduce((s, c) => s + Number(c.total_amount ?? 0), 0);
++
++  const lastPingFor = (agentId: string) =>
++    [...pingList].reverse().find((p) => p.agent_id === agentId) ?? null;
++
++  /*
++   * LIVE TRACKING PLAN — PHASE 4: Agent detail
++   *
++   * Everything here is derived from data already on this page (pings,
++   * points, point-farmers, collections) — no new per-click query. ETA,
++   * scheduled time, delay and MCC ETA are deliberately NOT computed here:
++   * those need real road routing and centre-configured timing rules,
++   * which is Phase 5 scope. Showing a straight-line/fixed-speed guess for
++   * them now would be exactly the "fake ETA" the plan says never to ship.
++   */
++  const focusedTrip = focusAgentId
++    ? (tripList.find((t) => t.agent_id === focusAgentId) ?? null)
++    : null;
++  const focusedPing = focusAgentId ? lastPingFor(focusAgentId) : null;
++  const focusedLive = classifyLiveStatus(focusedPing?.recorded_at ?? null);
++
++  const routePointsForFocusedRoute = useMemo(() => {
++    if (!focusedTrip) return [];
++    return (points ?? [])
++      .filter((p) => p.route_id === focusedTrip.route_id)
++      .sort((a, b) => a.sequence - b.sequence);
++  }, [points, focusedTrip]);
++
++  const farmersForFocusedRoute = useMemo(() => {
++    const pointIds = new Set(routePointsForFocusedRoute.map((p) => p.id));
++    return (pointFarmers ?? [])
++      .filter((f) => pointIds.has(f.route_point_id))
++      .sort((a, b) => a.sequence - b.sequence);
++  }, [pointFarmers, routePointsForFocusedRoute]);
++
++  const tripCollections = useMemo(
++    () =>
++      focusedTrip
++        ? collectionList.filter((c) => c.agents?.full_name === focusedTrip.agents?.full_name)
++        : [],
++    [collectionList, focusedTrip],
++  );
++  // Collections don't carry farmer_id on this feed, only farmer name — match
++  // on name (same limitation as the rest of this feed, which already keys
++  // collection→agent by name for display).
++  const collectedFarmerNames = useMemo(
++    () => new Set(tripCollections.map((c) => c.farmers?.full_name).filter(Boolean)),
++    [tripCollections],
++  );
++
++  const nextUncollectedFarmer = farmersForFocusedRoute.find(
++    (f) => !collectedFarmerNames.has(f.full_name),
++  );
++  const nextFarmerIndex = nextUncollectedFarmer
++    ? farmersForFocusedRoute.findIndex((f) => f.farmer_id === nextUncollectedFarmer.farmer_id)
++    : -1;
++  const currentFarmer = nextFarmerIndex >= 0 ? nextUncollectedFarmer : null;
++  const upcomingFarmer =
++    nextFarmerIndex >= 0 && nextFarmerIndex + 1 < farmersForFocusedRoute.length
++      ? farmersForFocusedRoute[nextFarmerIndex + 1]
++      : null;
++
++  const farmersTotal = farmersForFocusedRoute.length;
++  const farmersCompleted = farmersForFocusedRoute.filter((f) =>
++    collectedFarmerNames.has(f.full_name),
++  ).length;
++  const litresThisTrip = tripCollections.reduce((s, c) => s + Number(c.quantity_litres ?? 0), 0);
++
++  const nextFarmerPoint = upcomingFarmer
++    ? (routePointsForFocusedRoute.find((p) => p.id === upcomingFarmer.route_point_id) ?? null)
++    : null;
++  const distanceToNextM =
++    focusedPing?.lat != null &&
++    focusedPing?.lng != null &&
++    nextFarmerPoint?.lat != null &&
++    nextFarmerPoint?.lng != null
++      ? haversineMeters(focusedPing.lat, focusedPing.lng, nextFarmerPoint.lat, nextFarmerPoint.lng)
++      : null;
++
++  // Stops for the directions request: focused agent's route, else every active stop.
++  const focusedRouteId = focusAgentId
++    ? (tripList.find((t) => t.agent_id === focusAgentId)?.route_id ?? null)
++    : null;
++
++  const [showDirections, setShowDirections] = useState(false);
++  const routeStops = useMemo(() => {
++    const list = (points ?? [])
++      .filter((p) => p.lat != null && p.lng != null)
++      .filter((p) => (focusedRouteId ? p.route_id === focusedRouteId : true))
++      .sort((a, b) => a.sequence - b.sequence)
++      .map((p) => ({ lat: p.lat!, lng: p.lng! }));
++    return list.slice(0, 25);
++  }, [points, focusedRouteId]);
++
++  const startPoint =
++    centre?.lat != null && centre.lng != null
++      ? { lat: centre.lat, lng: centre.lng }
++      : (routeStops[0] ?? null);
++
++  const runComputeRoute = useServerFn(computeRoute);
++  const directions = useQuery({
++    queryKey: ["directions", focusedRouteId, routeStops.length, startPoint?.lat, startPoint?.lng],
++    enabled: showDirections && Boolean(startPoint) && routeStops.length > 0,
++    staleTime: 300_000,
++    retry: false,
++    queryFn: () =>
++      runComputeRoute({
++        data: {
++          origin: startPoint!,
++          destination: routeStops[routeStops.length - 1]!,
++          waypoints: routeStops.slice(0, -1),
++        },
++      }),
++  });
++
++  const km = directions.data ? (directions.data.distanceMeters / 1000).toFixed(1) : null;
++  const mins = directions.data ? Math.round(directions.data.durationSeconds / 60) : null;
++
++  return (
++    <AppShell nav={MANAGER_NAV}>
++      <PageHeading
++        title="Live operations"
++        subtitle={
++          mcc
++            ? `${mcc.name} · ${mcc.code} — agent positions and collections update in realtime.`
++            : "No collection centre assigned to you yet."
++        }
++      />
++
++      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
++        <StatCard
++          label="Agents on route"
++          value={active.length}
++          icon={<Users className="h-4 w-4" />}
++        />
++        <StatCard
++          label="GPS pings today"
++          value={pingList.length}
++          icon={<Activity className="h-4 w-4" />}
++        />
++        <StatCard
++          label="Litres collected"
++          value={litres.toFixed(1)}
++          icon={<Milk className="h-4 w-4" />}
++        />
++        <StatCard label="Value today" value={formatCurrency(value)} />
++      </div>
++
++      <div className="mt-4 grid gap-4 lg:grid-cols-[2fr_1fr]">
++        <div className="surface-card overflow-hidden p-2">
++          <div className="flex flex-wrap items-center justify-between gap-2 px-2 pb-2 pt-1">
++            <p className="text-sm text-muted-foreground">
++              {focusedRouteId ? "Route for selected agent" : "All active route stops"} ·{" "}
++              {routeStops.length} stops
++            </p>
++            <div className="flex items-center gap-2">
++              {directions.data && (
++                <Badge variant="secondary">
++                  {km} km · {mins} min drive
++                </Badge>
++              )}
++              <Button
++                size="sm"
++                variant={showDirections ? "default" : "outline"}
++                disabled={routeStops.length === 0}
++                onClick={() => setShowDirections((v) => !v)}
++              >
++                <Navigation className="mr-1 h-4 w-4" />
++                {showDirections ? "Hide directions" : "Show directions"}
++              </Button>
++            </div>
++          </div>
++          {showDirections && directions.isError && (
++            <p className="px-2 pb-2 text-xs text-destructive">
++              {(directions.error as Error).message}
++            </p>
++          )}
++          <ClientOnly
++            fallback={
++              <div className="flex h-[420px] items-center justify-center text-sm text-muted-foreground lg:h-[560px]">
++                Loading map…
++              </div>
++            }
++          >
++            <Suspense
++              fallback={
++                <div className="flex h-[420px] items-center justify-center text-sm text-muted-foreground lg:h-[560px]">
++                  Loading map…
++                </div>
++              }
++            >
++              <LiveMap
++                centre={centre ?? null}
++                trips={tripList}
++                pings={pingList}
++                points={points ?? []}
++                collections={collectionList}
++                focusAgentId={focusAgentId}
++                directionsPolyline={showDirections ? (directions.data?.polyline ?? null) : null}
++              />
++            </Suspense>
++          </ClientOnly>
++        </div>
++
++        <div className="space-y-4">
++          <div className="surface-card p-4">
++            <div className="mb-3 flex items-center justify-between">
++              <h2 className="font-semibold">Agents today</h2>
++              {focusAgentId && (
++                <Button size="sm" variant="ghost" onClick={() => setFocusAgentId(null)}>
++                  Show all
++                </Button>
++              )}
++            </div>
++            <ul className="space-y-2">
++              {tripList.map((trip) => {
++                const ping = lastPingFor(trip.agent_id);
++                const stop = (points ?? []).find((p) => p.id === trip.current_route_point_id);
++                const live = classifyLiveStatus(ping?.recorded_at ?? null);
++                return (
++                  <li
++                    key={trip.id}
++                    className={`cursor-pointer rounded-lg border border-border p-3 transition-colors hover:bg-secondary ${
++                      focusAgentId === trip.agent_id ? "bg-primary-soft" : ""
++                    }`}
++                    onClick={() =>
++                      setFocusAgentId(focusAgentId === trip.agent_id ? null : trip.agent_id)
++                    }
++                  >
++                    <div className="flex items-center justify-between gap-2">
++                      <p className="font-medium">{trip.agents?.full_name ?? "Agent"}</p>
++                      <Badge variant={trip.status === "in_progress" ? "default" : "secondary"}>
++                        {trip.status === "in_progress" ? "On route" : trip.status}
++                      </Badge>
++                    </div>
++                    <p className="mt-1 text-xs text-muted-foreground">
++                      {trip.routes?.name ?? "Route"} · {trip.session} · started{" "}
++                      {timeAgo(trip.started_at)}
++                    </p>
++                    <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
++                      <MapPinned className="h-3 w-3" />
++                      {stop ? `At ${stop.name}` : "No stop marked"}
++                    </p>
++                    <p
++                      className={`mt-1 flex items-center gap-1 text-xs font-medium ${
++                        live.isLive ? "text-emerald-600" : "text-amber-600"
++                      }`}
++                    >
++                      <Radio className="h-3 w-3" />
++                      {live.isLive ? "LIVE" : "LOCATION STALE"} · {live.label}
++                    </p>
++                  </li>
++                );
++              })}
++              {tripList.length === 0 && (
++                <li className="py-8 text-center text-sm text-muted-foreground">
++                  No trips started today.
++                </li>
++              )}
++            </ul>
++          </div>
++
++          {focusedTrip && (
++            <div className="surface-card p-4">
++              <div className="mb-3 flex items-center justify-between">
++                <h2 className="font-semibold">{focusedTrip.agents?.full_name ?? "Agent"}</h2>
++                <span
++                  className={`flex items-center gap-1 text-xs font-semibold ${
++                    focusedLive.isLive ? "text-emerald-600" : "text-amber-600"
++                  }`}
++                >
++                  <Radio className="h-3 w-3" />
++                  {focusedLive.isLive ? "LIVE" : "STALE"}
++                </span>
++              </div>
++              <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
++                <dt className="text-muted-foreground">Route</dt>
++                <dd className="text-right font-medium">{focusedTrip.routes?.name ?? "—"}</dd>
++
++                <dt className="text-muted-foreground">Current location</dt>
++                <dd className="text-right font-medium">
++                  {focusedPing?.lat != null && focusedPing?.lng != null
++                    ? `${focusedPing.lat.toFixed(4)}, ${focusedPing.lng.toFixed(4)}`
++                    : "—"}
++                </dd>
++
++                <dt className="text-muted-foreground">Current farmer</dt>
++                <dd className="text-right font-medium">{currentFarmer?.full_name ?? "—"}</dd>
++
++                <dt className="text-muted-foreground">Next farmer</dt>
++                <dd className="text-right font-medium">{upcomingFarmer?.full_name ?? "—"}</dd>
++
++                <dt className="flex items-center gap-1 text-muted-foreground">
++                  <Gauge className="h-3 w-3" /> Speed
++                </dt>
++                <dd className="text-right font-medium">
++                  {focusedPing?.speed_kmh != null
++                    ? `${focusedPing.speed_kmh.toFixed(0)} km/h`
++                    : "—"}
++                </dd>
++
++                <dt className="text-muted-foreground">Distance to next</dt>
++                <dd className="text-right font-medium">
++                  {distanceToNextM != null ? `${(distanceToNextM / 1000).toFixed(2)} km` : "—"}
++                </dd>
++
++                <dt className="text-muted-foreground">Farmers</dt>
++                <dd className="text-right font-medium">
++                  {farmersCompleted} / {farmersTotal} done
++                </dd>
++
++                <dt className="text-muted-foreground">Milk collected</dt>
++                <dd className="text-right font-medium">{litresThisTrip.toFixed(1)} L</dd>
++
++                <dt className="text-muted-foreground">Last update</dt>
++                <dd className="text-right font-medium">{focusedLive.label}</dd>
++
++                <dt className="text-muted-foreground">ETA · Delay · MCC ETA</dt>
++                <dd className="text-right text-xs text-muted-foreground">Coming in Phase 5</dd>
++              </dl>
++            </div>
++          )}
++
++          <div className="surface-card p-4">
++            <h2 className="mb-3 font-semibold">Live collection feed</h2>
++            <ul className="max-h-80 space-y-2 overflow-y-auto">
++              {collectionList.slice(0, 25).map((c) => (
++                <li key={c.id} className="flex items-center justify-between gap-3 text-sm">
++                  <div>
++                    <p className="font-medium">{c.farmers?.full_name ?? "Farmer"}</p>
++                    <p className="text-xs text-muted-foreground">
++                      {c.agents?.full_name ?? "Centre"} · {timeAgo(c.collected_at)}
++                    </p>
++                  </div>
++                  <div className="text-right">
++                    <p className="font-semibold">{Number(c.quantity_litres).toFixed(1)} L</p>
++                    <p className="text-xs text-muted-foreground">
++                      {formatCurrency(Number(c.total_amount ?? 0))}
++                    </p>
++                  </div>
++                  {Number(c.risk_score ?? 0) >= 40 && <Badge variant="destructive">Suspect</Badge>}
++                </li>
++              ))}
++              {collectionList.length === 0 && (
++                <li className="py-8 text-center text-sm text-muted-foreground">
++                  No collections recorded today yet.
++                </li>
++              )}
++            </ul>
++          </div>
++        </div>
++      </div>
++    </AppShell>
++  );
++}
+diff --git a/src/routes/_authenticated/route-marking.tsx b/src/routes/_authenticated/route-marking.tsx
+index 83c6040..b0cb2f7 100644
+--- a/src/routes/_authenticated/route-marking.tsx
++++ b/src/routes/_authenticated/route-marking.tsx
+@@ -1,17 +1,7 @@
+ import { useEffect, useRef, useState } from "react";
+ import { createFileRoute, useNavigate } from "@tanstack/react-router";
+ import { useMutation } from "@tanstack/react-query";
+-import {
+-  MapPin,
+-  Play,
+-  Square,
+-  Plus,
+-  Trash2,
+-  Save,
+-  Navigation2,
+-  Clock,
+-  Ruler,
+-} from "lucide-react";
++import { MapPin, Play, Square, Plus, Trash2, Save, Navigation2, Clock, Ruler } from "lucide-react";
+ import { toast } from "sonner";
+ import { supabase } from "@/integrations/supabase/client";
+ import { AppShell, PageHeading } from "@/components/app-shell";
+@@ -21,6 +11,7 @@ import { Label } from "@/components/ui/label";
+ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+ import { useAgentContext } from "@/hooks/useAgentContext";
+ import { useLiveLocation } from "@/hooks/useLiveLocation";
++import { useActiveTrackingSession } from "@/hooks/useActiveTrackingSession";
+ import { getCoords, haversineMeters } from "@/lib/geo";
+ 
+ export const Route = createFileRoute("/_authenticated/route-marking")({
+@@ -29,7 +20,8 @@ export const Route = createFileRoute("/_authenticated/route-marking")({
+       { title: "Mark a route — DairyOne" },
+       {
+         name: "description",
+-        content: "Walk or drive a new collection route with live GPS tracking and save it for reuse.",
++        content:
++          "Walk or drive a new collection route with live GPS tracking and save it for reuse.",
+       },
+     ],
+   }),
+@@ -95,9 +87,12 @@ function RouteMarkingScreen() {
+     };
+   }, [agent, tripId]);
+ 
++  const { data: activeSession } = useActiveTrackingSession(agent?.agentId ?? null);
++
+   const { coords: livePos } = useLiveLocation({
+     enabled: Boolean(tripId && agent),
+     tripId,
++    trackingSessionId: activeSession?.id ?? null,
+     agentId: agent?.agentId ?? null,
+     mccId: agent?.mccId ?? null,
+     routePointId: null,
+@@ -285,8 +280,8 @@ function RouteMarkingScreen() {
+         <>
+           {resumed && (
+             <div className="surface-card mb-4 border-amber-500/40 bg-amber-500/5 p-4 text-sm">
+-              Resumed an unfinished marking trip. Stops added before you left couldn't be recovered —
+-              re-add any you need, or discard and start fresh.
++              Resumed an unfinished marking trip. Stops added before you left couldn't be recovered
++              — re-add any you need, or discard and start fresh.
+             </div>
+           )}
+           <div className="surface-card mb-4 grid grid-cols-3 gap-3 p-4 text-center">
+@@ -297,7 +292,9 @@ function RouteMarkingScreen() {
+             </div>
+             <div>
+               <Ruler className="mx-auto h-4 w-4 text-muted-foreground" />
+-              <p className="mt-1 text-lg font-bold tabular-nums">{(distance / 1000).toFixed(2)} km</p>
++              <p className="mt-1 text-lg font-bold tabular-nums">
++                {(distance / 1000).toFixed(2)} km
++              </p>
+               <p className="text-xs text-muted-foreground">Distance</p>
+             </div>
+             <div>
+diff --git a/src/routes/_authenticated/trip.tsx b/src/routes/_authenticated/trip.tsx
+index ebe7559..62f4a97 100644
+--- a/src/routes/_authenticated/trip.tsx
++++ b/src/routes/_authenticated/trip.tsx
+@@ -37,6 +37,7 @@ import type { TripStop } from "@/components/agent-trip-map";
+ import { useAgentContext } from "@/hooks/useAgentContext";
+ import { useOfflineQueue } from "@/hooks/useOfflineQueue";
+ import { useLiveLocation } from "@/hooks/useLiveLocation";
++import { useActiveTrackingSession } from "@/hooks/useActiveTrackingSession";
+ import { getCoords } from "@/lib/geo";
+ import { computeRoute } from "@/lib/maps.functions";
+ import { QrScanner } from "@/components/qr-scanner";
+@@ -423,9 +424,12 @@ function TripScreen() {
+    * in-app distance/ETA and the mini route map below.
+    */
+ 
++  const { data: activeSession } = useActiveTrackingSession(agent?.agentId ?? null);
++
+   const { coords: livePos } = useLiveLocation({
+     enabled: Boolean(trip?.id && agent),
+     tripId: trip?.id ?? null,
++    trackingSessionId: activeSession?.id ?? null,
+     agentId: agent?.agentId ?? null,
+     mccId: agent?.mccId ?? null,
+     routePointId: trip?.current_route_point_id ?? null,
+diff --git a/supabase/migrations/20260821090000_livetrack_phase3_continuous_gps.sql b/supabase/migrations/20260821090000_livetrack_phase3_continuous_gps.sql
+new file mode 100644
+index 0000000..5e05791
+--- /dev/null
++++ b/supabase/migrations/20260821090000_livetrack_phase3_continuous_gps.sql
+@@ -0,0 +1,71 @@
++-- LIVE TRACKING PLAN — PHASE 3: Continuous GPS + Location Storage
++-- Extends the existing gps_pings table (created earlier for Part 1 route
++-- tracking) rather than creating a new location_events table, since it
++-- already has agent/mcc/trip/route_point linkage, RLS, and realtime wired.
++-- Adds: heading/altitude, an explicit link to tracking_sessions (Phase 2)
++-- so pings can start at Punch In before a trip exists, a quality
++-- classification, and idempotency/sync-state columns (client_id is used
++-- now to de-dupe watchPosition double-fires; sync_state/synced_at lay the
++-- groundwork Phase 8's offline queue will fill in — writes are still
++-- direct/online-only as of this phase).
++--
++-- NOTE: applied directly to the live project (uuhhyzxagzswcjfhngom) via
++-- apply_migration under the same name. This file mirrors that migration
++-- for repo history — keep the two in sync if you edit further.
++
++alter table public.gps_pings
++  add column heading double precision,
++  add column altitude double precision,
++  add column tracking_session_id uuid references public.tracking_sessions(id) on delete set null,
++  add column quality text check (quality in ('good','weak','stale')) default 'good',
++  add column client_id text,
++  add column sync_state text not null default 'synced'
++    check (sync_state in ('synced','pending','syncing','failed')),
++  add column synced_at timestamptz not null default now();
++
++comment on column public.gps_pings.recorded_at is 'Original device/GPS timestamp of the fix (authoritative for ordering/replay).';
++comment on column public.gps_pings.synced_at is 'When the server actually received/stored this row — may lag recorded_at once Phase 8 offline queueing lands.';
++comment on column public.gps_pings.quality is 'good: accuracy <=20m fresh fix. weak: accuracy >20m but still usable. stale: fix older than the staleness window when written (defensive; client should avoid sending these).';
++
++-- Idempotency: retried uploads (double watchPosition fires, client retry
++-- logic) must never duplicate a row. Partial unique index since client_id
++-- is only populated going forward; historical/NULL rows are unaffected.
++create unique index gps_pings_client_id_uidx
++  on public.gps_pings(client_id) where client_id is not null;
++
++create index gps_pings_tracking_session_idx
++  on public.gps_pings(tracking_session_id, recorded_at desc)
++  where tracking_session_id is not null;
++
++-- Keep tracking_sessions.last_location_* in sync with the freshest good/weak
++-- ping for that session, so Phase 4's live map (and anything else reading
++-- tracking_sessions) doesn't need to separately poll gps_pings. Stale-quality
++-- pings intentionally do NOT update last_location — a stale fix must never
++-- make a session look more current than it is.
++create or replace function public.touch_tracking_session_from_ping()
++returns trigger
++language plpgsql
++security definer
++set search_path = public
++as $$
++begin
++  if new.tracking_session_id is not null and new.quality <> 'stale' then
++    update public.tracking_sessions
++    set last_location_lat = new.lat,
++        last_location_lng = new.lng,
++        last_location_at = new.recorded_at,
++        -- A ping proves live GPS is flowing again; a session parked in
++        -- DEGRADED (e.g. after a transient gps_disabled/network failure)
++        -- recovers to ACTIVE rather than staying stuck.
++        status = case when status = 'DEGRADED' then 'ACTIVE' else status end,
++        failure_reason = case when status = 'DEGRADED' then null else failure_reason end
++    where id = new.tracking_session_id
++      and status in ('ACTIVE','DEGRADED');
++  end if;
++  return new;
++end;
++$$;
++
++create trigger t_gps_pings_touch_session
++  after insert on public.gps_pings
++  for each row execute function public.touch_tracking_session_from_ping();

@@ -1,0 +1,827 @@
+diff --git a/src/hooks/useCurrentUser.ts b/src/hooks/useCurrentUser.ts
+index b5e2364..f394842 100644
+--- a/src/hooks/useCurrentUser.ts
++++ b/src/hooks/useCurrentUser.ts
+@@ -10,27 +10,37 @@ export type SessionProfile = {
+   mccIds: string[];
+ };
+ 
+-export function useCurrentUser() {
+-  return useQuery<SessionProfile | null>({
+-    queryKey: ["current-user"],
+-    queryFn: async () => {
+-      const { data: userData } = await supabase.auth.getUser();
+-      const user = userData.user;
+-      if (!user) return null;
++export const CURRENT_USER_QUERY_KEY = ["current-user"] as const;
++export const CURRENT_USER_STALE_TIME = 60_000;
+ 
+-      const [{ data: profile }, { data: roles }] = await Promise.all([
+-        supabase.from("profiles").select("full_name, phone").eq("id", user.id).maybeSingle(),
+-        supabase.from("user_roles").select("role, mcc_id").eq("user_id", user.id),
+-      ]);
++/**
++ * Fetches the signed-in user's profile + role. Extracted from the hook below
++ * so route `beforeLoad` guards (see lib/route-guards.ts) can warm the exact
++ * same react-query cache entry instead of issuing a second, divergent fetch.
++ */
++export async function fetchCurrentUser(): Promise<SessionProfile | null> {
++  const { data: userData } = await supabase.auth.getUser();
++  const user = userData.user;
++  if (!user) return null;
+ 
+-      return {
+-        userId: user.id,
+-        fullName: profile?.full_name ?? null,
+-        phone: profile?.phone ?? null,
+-        role: (roles?.[0]?.role as AppRole | undefined) ?? null,
+-        mccIds: (roles ?? []).map((r) => r.mcc_id).filter((v): v is string => Boolean(v)),
+-      };
+-    },
+-    staleTime: 60_000,
++  const [{ data: profile }, { data: roles }] = await Promise.all([
++    supabase.from("profiles").select("full_name, phone").eq("id", user.id).maybeSingle(),
++    supabase.from("user_roles").select("role, mcc_id").eq("user_id", user.id),
++  ]);
++
++  return {
++    userId: user.id,
++    fullName: profile?.full_name ?? null,
++    phone: profile?.phone ?? null,
++    role: (roles?.[0]?.role as AppRole | undefined) ?? null,
++    mccIds: (roles ?? []).map((r) => r.mcc_id).filter((v): v is string => Boolean(v)),
++  };
++}
++
++export function useCurrentUser() {
++  return useQuery<SessionProfile | null>({
++    queryKey: [...CURRENT_USER_QUERY_KEY],
++    queryFn: fetchCurrentUser,
++    staleTime: CURRENT_USER_STALE_TIME,
+   });
+ }
+diff --git a/src/lib/route-guards.ts b/src/lib/route-guards.ts
+new file mode 100644
+index 0000000..4dd12ac
+--- /dev/null
++++ b/src/lib/route-guards.ts
+@@ -0,0 +1,31 @@
++import { redirect } from "@tanstack/react-router";
++import type { AppRole } from "@/lib/roles";
++import type { SessionProfile } from "@/hooks/useCurrentUser";
++
++/**
++ * AUDIT ITEM #4 — role-based route protection.
++ *
++ * Previously the only `beforeLoad` guard in the app checked "are you logged
++ * in", full stop — which role can see which page was enforced only by the
++ * nav bar not showing the link. RLS still returns empty data for the wrong
++ * role, so nothing was insecure, but typing /owner or /finance into the
++ * address bar (or opening a bookmark/shared link) landed anyone on a
++ * confusing blank/broken-looking dashboard instead of a clear message.
++ *
++ * `requireRole` runs in a route's `beforeLoad`, using the profile the parent
++ * `_authenticated` route already fetched (see routes/_authenticated/route.tsx),
++ * and redirects to a dedicated "Access denied" screen when the signed-in
++ * user's role isn't one of the roles allowed on that page.
++ *
++ * Usage:
++ *   export const Route = createFileRoute("/_authenticated/owner")({
++ *     beforeLoad: ({ context }) => requireRole(context.profile, ["owner"]),
++ *     component: OwnerDashboard,
++ *   });
++ */
++export function requireRole(profile: SessionProfile | null | undefined, allowedRoles: AppRole[]) {
++  const role = profile?.role ?? null;
++  if (!role || !allowedRoles.includes(role)) {
++    throw redirect({ to: "/forbidden" });
++  }
++}
+diff --git a/src/routeTree.gen.ts b/src/routeTree.gen.ts
+index 9f3c04f..54f184b 100644
+--- a/src/routeTree.gen.ts
++++ b/src/routeTree.gen.ts
+@@ -21,6 +21,7 @@ import { Route as AuthenticatedCollectionsRouteImport } from './routes/_authenti
+ import { Route as AuthenticatedFarmerRouteImport } from './routes/_authenticated/farmer'
+ import { Route as AuthenticatedFieldSetupRouteImport } from './routes/_authenticated/field-setup'
+ import { Route as AuthenticatedFinanceRouteImport } from './routes/_authenticated/finance'
++import { Route as AuthenticatedForbiddenRouteImport } from './routes/_authenticated/forbidden'
+ import { Route as AuthenticatedHandoverRouteImport } from './routes/_authenticated/handover'
+ import { Route as AuthenticatedHandoversRouteImport } from './routes/_authenticated/handovers'
+ import { Route as AuthenticatedLiveRouteImport } from './routes/_authenticated/live'
+@@ -94,6 +95,11 @@ const AuthenticatedFinanceRoute = AuthenticatedFinanceRouteImport.update({
+   path: '/finance',
+   getParentRoute: () => AuthenticatedRouteRoute,
+ } as any)
++const AuthenticatedForbiddenRoute = AuthenticatedForbiddenRouteImport.update({
++  id: '/forbidden',
++  path: '/forbidden',
++  getParentRoute: () => AuthenticatedRouteRoute,
++} as any)
+ const AuthenticatedHandoverRoute = AuthenticatedHandoverRouteImport.update({
+   id: '/handover',
+   path: '/handover',
+@@ -169,6 +175,7 @@ export interface FileRoutesByFullPath {
+   '/farmer': typeof AuthenticatedFarmerRoute
+   '/field-setup': typeof AuthenticatedFieldSetupRoute
+   '/finance': typeof AuthenticatedFinanceRoute
++  '/forbidden': typeof AuthenticatedForbiddenRoute
+   '/handover': typeof AuthenticatedHandoverRoute
+   '/handovers': typeof AuthenticatedHandoversRoute
+   '/live': typeof AuthenticatedLiveRoute
+@@ -194,6 +201,7 @@ export interface FileRoutesByTo {
+   '/farmer': typeof AuthenticatedFarmerRoute
+   '/field-setup': typeof AuthenticatedFieldSetupRoute
+   '/finance': typeof AuthenticatedFinanceRoute
++  '/forbidden': typeof AuthenticatedForbiddenRoute
+   '/handover': typeof AuthenticatedHandoverRoute
+   '/handovers': typeof AuthenticatedHandoversRoute
+   '/live': typeof AuthenticatedLiveRoute
+@@ -221,6 +229,7 @@ export interface FileRoutesById {
+   '/_authenticated/farmer': typeof AuthenticatedFarmerRoute
+   '/_authenticated/field-setup': typeof AuthenticatedFieldSetupRoute
+   '/_authenticated/finance': typeof AuthenticatedFinanceRoute
++  '/_authenticated/forbidden': typeof AuthenticatedForbiddenRoute
+   '/_authenticated/handover': typeof AuthenticatedHandoverRoute
+   '/_authenticated/handovers': typeof AuthenticatedHandoversRoute
+   '/_authenticated/live': typeof AuthenticatedLiveRoute
+@@ -248,6 +257,7 @@ export interface FileRouteTypes {
+     | '/farmer'
+     | '/field-setup'
+     | '/finance'
++    | '/forbidden'
+     | '/handover'
+     | '/handovers'
+     | '/live'
+@@ -273,6 +283,7 @@ export interface FileRouteTypes {
+     | '/farmer'
+     | '/field-setup'
+     | '/finance'
++    | '/forbidden'
+     | '/handover'
+     | '/handovers'
+     | '/live'
+@@ -299,6 +310,7 @@ export interface FileRouteTypes {
+     | '/_authenticated/farmer'
+     | '/_authenticated/field-setup'
+     | '/_authenticated/finance'
++    | '/_authenticated/forbidden'
+     | '/_authenticated/handover'
+     | '/_authenticated/handovers'
+     | '/_authenticated/live'
+@@ -405,6 +417,13 @@ declare module '@tanstack/react-router' {
+       preLoaderRoute: typeof AuthenticatedFinanceRouteImport
+       parentRoute: typeof AuthenticatedRouteRoute
+     }
++    '/_authenticated/forbidden': {
++      id: '/_authenticated/forbidden'
++      path: '/forbidden'
++      fullPath: '/forbidden'
++      preLoaderRoute: typeof AuthenticatedForbiddenRouteImport
++      parentRoute: typeof AuthenticatedRouteRoute
++    }
+     '/_authenticated/handover': {
+       id: '/_authenticated/handover'
+       path: '/handover'
+@@ -502,6 +521,7 @@ interface AuthenticatedRouteRouteChildren {
+   AuthenticatedFarmerRoute: typeof AuthenticatedFarmerRoute
+   AuthenticatedFieldSetupRoute: typeof AuthenticatedFieldSetupRoute
+   AuthenticatedFinanceRoute: typeof AuthenticatedFinanceRoute
++  AuthenticatedForbiddenRoute: typeof AuthenticatedForbiddenRoute
+   AuthenticatedHandoverRoute: typeof AuthenticatedHandoverRoute
+   AuthenticatedHandoversRoute: typeof AuthenticatedHandoversRoute
+   AuthenticatedLiveRoute: typeof AuthenticatedLiveRoute
+@@ -526,6 +546,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+   AuthenticatedFarmerRoute: AuthenticatedFarmerRoute,
+   AuthenticatedFieldSetupRoute: AuthenticatedFieldSetupRoute,
+   AuthenticatedFinanceRoute: AuthenticatedFinanceRoute,
++  AuthenticatedForbiddenRoute: AuthenticatedForbiddenRoute,
+   AuthenticatedHandoverRoute: AuthenticatedHandoverRoute,
+   AuthenticatedHandoversRoute: AuthenticatedHandoversRoute,
+   AuthenticatedLiveRoute: AuthenticatedLiveRoute,
+diff --git a/src/routes/_authenticated/accountant.tsx b/src/routes/_authenticated/accountant.tsx
+index 805295e..f3e7f27 100644
+--- a/src/routes/_authenticated/accountant.tsx
++++ b/src/routes/_authenticated/accountant.tsx
+@@ -6,8 +6,10 @@ import { AppShell, PageHeading, StatCard } from "@/components/app-shell";
+ import { useStaffMcc } from "@/hooks/useStaffMcc";
+ import { FINANCE_NAV } from "@/lib/nav";
+ import { formatCurrency } from "@/lib/pricing";
++import { requireRole } from "@/lib/route-guards";
+ 
+ export const Route = createFileRoute("/_authenticated/accountant")({
++  beforeLoad: ({ context }) => requireRole(context.profile, ["accountant"]),
+   head: () => ({
+     meta: [
+       { title: "Finance desk — DairyOne" },
+diff --git a/src/routes/_authenticated/agent.tsx b/src/routes/_authenticated/agent.tsx
+index 49d3b86..681b7f6 100644
+--- a/src/routes/_authenticated/agent.tsx
++++ b/src/routes/_authenticated/agent.tsx
+@@ -24,8 +24,10 @@ import { useLiveLocation } from "@/hooks/useLiveLocation";
+ import { useGpsSync } from "@/hooks/useGpsSync";
+ import { getCoords } from "@/lib/geo";
+ import { formatCurrency } from "@/lib/pricing";
++import { requireRole } from "@/lib/route-guards";
+ 
+ export const Route = createFileRoute("/_authenticated/agent")({
++  beforeLoad: ({ context }) => requireRole(context.profile, ["agent"]),
+   head: () => ({
+     meta: [
+       { title: "Agent home — DairyOne field collection" },
+diff --git a/src/routes/_authenticated/buyer.tsx b/src/routes/_authenticated/buyer.tsx
+index 2dfebfc..a558051 100644
+--- a/src/routes/_authenticated/buyer.tsx
++++ b/src/routes/_authenticated/buyer.tsx
+@@ -6,8 +6,10 @@ import { supabase } from "@/integrations/supabase/client";
+ import { AppShell, PageHeading, StatCard } from "@/components/app-shell";
+ import { Button } from "@/components/ui/button";
+ import { Badge } from "@/components/ui/badge";
++import { requireRole } from "@/lib/route-guards";
+ 
+ export const Route = createFileRoute("/_authenticated/buyer")({
++  beforeLoad: ({ context }) => requireRole(context.profile, ["buyer"]),
+   head: () => ({
+     meta: [
+       { title: "Incoming milk transfers — DairyOne" },
+diff --git a/src/routes/_authenticated/cards.tsx b/src/routes/_authenticated/cards.tsx
+index deac278..b4375aa 100644
+--- a/src/routes/_authenticated/cards.tsx
++++ b/src/routes/_authenticated/cards.tsx
+@@ -12,8 +12,10 @@ import { useStaffMcc } from "@/hooks/useStaffMcc";
+ import { useCurrentUser } from "@/hooks/useCurrentUser";
+ import { cardCodeFor, cardUrl, qrDataUrl } from "@/lib/qr";
+ import { navForRole } from "@/lib/nav";
++import { requireRole } from "@/lib/route-guards";
+ 
+ export const Route = createFileRoute("/_authenticated/cards")({
++  beforeLoad: ({ context }) => requireRole(context.profile, ["manager", "owner"]),
+   head: () => ({
+     meta: [
+       { title: "QR cards — DairyOne" },
+diff --git a/src/routes/_authenticated/collect.tsx b/src/routes/_authenticated/collect.tsx
+index 5eabf33..7366cde 100644
+--- a/src/routes/_authenticated/collect.tsx
++++ b/src/routes/_authenticated/collect.tsx
+@@ -16,8 +16,10 @@ import { useStaffMcc } from "@/hooks/useStaffMcc";
+ import { formatCurrency } from "@/lib/pricing";
+ import { navForRole } from "@/lib/nav";
+ import { useCurrentUser } from "@/hooks/useCurrentUser";
++import { requireRole } from "@/lib/route-guards";
+ 
+ export const Route = createFileRoute("/_authenticated/collect")({
++  beforeLoad: ({ context }) => requireRole(context.profile, ["manager", "owner", "accountant"]),
+   head: () => ({
+     meta: [
+       { title: "Collect milk queue — DairyOne" },
+diff --git a/src/routes/_authenticated/collections.tsx b/src/routes/_authenticated/collections.tsx
+index 7fcb652..9da1a01 100644
+--- a/src/routes/_authenticated/collections.tsx
++++ b/src/routes/_authenticated/collections.tsx
+@@ -8,8 +8,10 @@ import { Badge } from "@/components/ui/badge";
+ import { useAgentContext } from "@/hooks/useAgentContext";
+ import { useOfflineQueue } from "@/hooks/useOfflineQueue";
+ import { formatCurrency } from "@/lib/pricing";
++import { requireRole } from "@/lib/route-guards";
+ 
+ export const Route = createFileRoute("/_authenticated/collections")({
++  beforeLoad: ({ context }) => requireRole(context.profile, ["agent"]),
+   head: () => ({
+     meta: [
+       { title: "My collections — DairyOne" },
+diff --git a/src/routes/_authenticated/farmer.tsx b/src/routes/_authenticated/farmer.tsx
+index 24c1bbd..904647c 100644
+--- a/src/routes/_authenticated/farmer.tsx
++++ b/src/routes/_authenticated/farmer.tsx
+@@ -4,8 +4,10 @@ import { IndianRupee, Droplets, HeartPulse } from "lucide-react";
+ import { supabase } from "@/integrations/supabase/client";
+ import { AppShell, PageHeading, PhaseCard, StatCard } from "@/components/app-shell";
+ import { useCurrentUser } from "@/hooks/useCurrentUser";
++import { requireRole } from "@/lib/route-guards";
+ 
+ export const Route = createFileRoute("/_authenticated/farmer")({
++  beforeLoad: ({ context }) => requireRole(context.profile, ["farmer"]),
+   component: FarmerHome,
+ });
+ 
+diff --git a/src/routes/_authenticated/field-setup.tsx b/src/routes/_authenticated/field-setup.tsx
+index 6b150fb..fa81670 100644
+--- a/src/routes/_authenticated/field-setup.tsx
++++ b/src/routes/_authenticated/field-setup.tsx
+@@ -19,6 +19,7 @@ import {
+   SelectValue,
+ } from "@/components/ui/select";
+ import { getCoords } from "@/lib/geo";
++import { requireRole } from "@/lib/route-guards";
+ 
+ const VEHICLE_TYPES = [
+   { value: "bike", label: "Bike" },
+@@ -28,6 +29,7 @@ const VEHICLE_TYPES = [
+ ] as const;
+ 
+ export const Route = createFileRoute("/_authenticated/field-setup")({
++  beforeLoad: ({ context }) => requireRole(context.profile, ["manager", "owner"]),
+   head: () => ({
+     meta: [
+       { title: "Field setup — agents, routes & farmers | DairyOne" },
+diff --git a/src/routes/_authenticated/finance.tsx b/src/routes/_authenticated/finance.tsx
+index 9bcf577..a8bab23 100644
+--- a/src/routes/_authenticated/finance.tsx
++++ b/src/routes/_authenticated/finance.tsx
+@@ -20,8 +20,10 @@ import { useStaffMcc } from "@/hooks/useStaffMcc";
+ import { FINANCE_NAV } from "@/lib/nav";
+ import { formatCurrency } from "@/lib/pricing";
+ import { buildSettlementLines, isoDaysAgo, sumLines, today } from "@/lib/settlement";
++import { requireRole } from "@/lib/route-guards";
+ 
+ export const Route = createFileRoute("/_authenticated/finance")({
++  beforeLoad: ({ context }) => requireRole(context.profile, ["manager", "owner", "accountant"]),
+   head: () => ({
+     meta: [
+       { title: "Settlements & ledgers — DairyOne" },
+diff --git a/src/routes/_authenticated/forbidden.tsx b/src/routes/_authenticated/forbidden.tsx
+new file mode 100644
+index 0000000..852cecb
+--- /dev/null
++++ b/src/routes/_authenticated/forbidden.tsx
+@@ -0,0 +1,41 @@
++import { createFileRoute, useNavigate } from "@tanstack/react-router";
++import { ShieldAlert } from "lucide-react";
++import { useCurrentUser } from "@/hooks/useCurrentUser";
++import { Button } from "@/components/ui/button";
++import { ROLE_HOME, type AppRole } from "@/lib/roles";
++
++export const Route = createFileRoute("/_authenticated/forbidden")({
++  head: () => ({
++    meta: [{ title: "Access denied — DairyOne" }],
++  }),
++  component: ForbiddenScreen,
++});
++
++/**
++ * AUDIT ITEM #4 — where role-guarded routes (lib/route-guards.ts) send
++ * someone whose role isn't allowed on the page they tried to open, instead
++ * of letting them land on a confusing blank/broken dashboard.
++ */
++function ForbiddenScreen() {
++  const navigate = useNavigate();
++  const { data: user } = useCurrentUser();
++  const home = user?.role ? ROLE_HOME[user.role as AppRole] : "/";
++
++  return (
++    <div className="flex min-h-screen items-center justify-center bg-background px-4">
++      <div className="max-w-md text-center">
++        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
++          <ShieldAlert className="h-6 w-6" />
++        </div>
++        <h1 className="mt-4 text-xl font-semibold tracking-tight text-foreground">You don't have access to this page</h1>
++        <p className="mt-2 text-sm text-muted-foreground">
++          This page is for a different role than the one on your account. If you think this is a mistake, ask an
++          owner or manager to check your account's role.
++        </p>
++        <div className="mt-6">
++          <Button onClick={() => navigate({ to: home ?? "/", replace: true })}>Go to your dashboard</Button>
++        </div>
++      </div>
++    </div>
++  );
++}
+diff --git a/src/routes/_authenticated/handover.$tripid.tsx b/src/routes/_authenticated/handover.$tripid.tsx
+deleted file mode 100644
+index 725d7fb..0000000
+--- a/src/routes/_authenticated/handover.$tripid.tsx
++++ /dev/null
+@@ -1,145 +0,0 @@
+-import { createFileRoute, Link } from "@tanstack/react-router";
+-import { useQuery } from "@tanstack/react-query";
+-import { CheckCircle2, Clock, AlertTriangle, ArrowLeft } from "lucide-react";
+-import { supabase } from "@/integrations/supabase/client";
+-import { AppShell, PageHeading, StatCard } from "@/components/app-shell";
+-import { Button } from "@/components/ui/button";
+-import { Badge } from "@/components/ui/badge";
+-
+-export const Route = createFileRoute("/_authenticated/handover/$tripid")({
+-  head: () => ({
+-    meta: [
+-      { title: "MCC handover — DairyOne" },
+-      {
+-        name: "description",
+-        content: "Declared milk handover status for a completed collection trip.",
+-      },
+-    ],
+-  }),
+-  component: HandoverStatus,
+-});
+-
+-const STATUS_COPY: Record<string, { label: string; hint: string }> = {
+-  declared: {
+-    label: "Awaiting MCC receipt",
+-    hint: "The centre hasn't confirmed the received quantity yet.",
+-  },
+-  received: {
+-    label: "Received — matched",
+-    hint: "The centre confirmed a matching quantity. Handover complete.",
+-  },
+-  variance_flagged: {
+-    label: "Variance flagged",
+-    hint: "Declared and received quantities don't match. A manager needs to acknowledge it.",
+-  },
+-  acknowledged: {
+-    label: "Variance acknowledged",
+-    hint: "The variance has been reviewed and closed out.",
+-  },
+-};
+-
+-function HandoverStatus() {
+-  const { tripId } = Route.useParams();
+-
+-  const { data: handover, isLoading } = useQuery({
+-    queryKey: ["mcc-handover", tripId],
+-    enabled: Boolean(tripId),
+-    // Keep polling lightly while we're waiting on the MCC to receipt it —
+-    // the Agent may be standing at the counter watching this screen.
+-    refetchInterval: (query) => (query.state.data?.status === "declared" ? 8_000 : false),
+-    queryFn: async () => {
+-      const { data, error } = await supabase
+-        .from("mcc_handovers")
+-        .select(
+-          "id, status, declared_quantity_litres, declared_collection_count, received_quantity_litres, variance_litres, variance_reason, receipt_notes, created_at, received_at",
+-        )
+-        .eq("trip_id", tripId)
+-        .maybeSingle();
+-      if (error) throw error;
+-      return data;
+-    },
+-  });
+-
+-  if (isLoading) {
+-    return (
+-      <AppShell mobileFirst>
+-        <PageHeading title="Loading handover…" />
+-      </AppShell>
+-    );
+-  }
+-
+-  if (!handover) {
+-    return (
+-      <AppShell mobileFirst>
+-        <PageHeading
+-          title="No handover found"
+-          subtitle="This trip hasn't been declared at the MCC yet."
+-        />
+-        <Button asChild size="lg" className="h-14 w-full text-base">
+-          <Link to="/agent">
+-            <ArrowLeft className="h-5 w-5" />
+-            Back to home
+-          </Link>
+-        </Button>
+-      </AppShell>
+-    );
+-  }
+-
+-  const copy = STATUS_COPY[handover.status] ?? { label: handover.status, hint: "" };
+-  const StatusIcon =
+-    handover.status === "received"
+-      ? CheckCircle2
+-      : handover.status === "declared"
+-        ? Clock
+-        : AlertTriangle;
+-
+-  return (
+-    <AppShell mobileFirst>
+-      <PageHeading title="MCC handover" subtitle="Your declared total for this trip." />
+-
+-      <div className="surface-card flex items-center gap-3 p-4">
+-        <StatusIcon
+-          className={`h-6 w-6 shrink-0 ${
+-            handover.status === "received"
+-              ? "text-primary"
+-              : handover.status === "declared"
+-                ? "text-muted-foreground"
+-                : "text-accent"
+-          }`}
+-        />
+-        <div className="flex-1">
+-          <div className="flex items-center gap-2">
+-            <p className="font-semibold">{copy.label}</p>
+-            <Badge variant={handover.status === "declared" ? "outline" : "secondary"}>
+-              {handover.status}
+-            </Badge>
+-          </div>
+-          <p className="mt-0.5 text-sm text-muted-foreground">{copy.hint}</p>
+-        </div>
+-      </div>
+-
+-      <div className="mt-4 grid grid-cols-2 gap-3">
+-        <StatCard label="You declared" value={`${handover.declared_quantity_litres} L`} />
+-        <StatCard label="Entries" value={handover.declared_collection_count} />
+-      </div>
+-
+-      {handover.received_quantity_litres != null && (
+-        <div className="mt-4 grid grid-cols-2 gap-3">
+-          <StatCard label="MCC received" value={`${handover.received_quantity_litres} L`} />
+-          <StatCard
+-            label="Variance"
+-            value={`${handover.variance_litres ?? 0} L`}
+-            hint={handover.variance_reason ?? undefined}
+-          />
+-        </div>
+-      )}
+-
+-      <Button asChild size="lg" variant="outline" className="mt-6 h-14 w-full text-base">
+-        <Link to="/agent">
+-          <ArrowLeft className="h-5 w-5" />
+-          Back to home
+-        </Link>
+-      </Button> 
+-    </AppShell>
+-  );
+-}
+\ No newline at end of file
+diff --git a/src/routes/_authenticated/handover.tsx b/src/routes/_authenticated/handover.tsx
+index 23dd8c5..87eb732 100644
+--- a/src/routes/_authenticated/handover.tsx
++++ b/src/routes/_authenticated/handover.tsx
+@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
+ import { AppShell, PageHeading, StatCard } from "@/components/app-shell";
+ import { Button } from "@/components/ui/button";
+ import { Badge } from "@/components/ui/badge";
++import { requireRole } from "@/lib/route-guards";
+ 
+ const searchSchema = z.object({
+   trip: z.string().uuid(),
+@@ -14,6 +15,7 @@ const searchSchema = z.object({
+ 
+ export const Route = createFileRoute("/_authenticated/handover")({
+   validateSearch: searchSchema,
++  beforeLoad: ({ context }) => requireRole(context.profile, ["agent"]),
+   head: () => ({
+     meta: [
+       { title: "MCC handover — DairyOne" },
+diff --git a/src/routes/_authenticated/handovers.tsx b/src/routes/_authenticated/handovers.tsx
+index 451cbc7..ef81e5b 100644
+--- a/src/routes/_authenticated/handovers.tsx
++++ b/src/routes/_authenticated/handovers.tsx
+@@ -13,8 +13,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
+ import { useCurrentUser } from "@/hooks/useCurrentUser";
+ import { useStaffMcc } from "@/hooks/useStaffMcc";
+ import { navForRole } from "@/lib/nav";
++import { requireRole } from "@/lib/route-guards";
+ 
+ export const Route = createFileRoute("/_authenticated/handovers")({
++  beforeLoad: ({ context }) => requireRole(context.profile, ["manager", "owner", "accountant"]),
+   head: () => ({
+     meta: [
+       { title: "MCC handovers — DairyOne" },
+@@ -155,6 +157,7 @@ function HandoversScreen() {
+           <Link
+             to="/trip-history/$tripid"
+             params={{ tripid: row.trip_id }}
++            search={{ from: "/handovers" }}
+             className="mt-1 inline-flex items-center gap-1 text-xs text-primary hover:underline"
+           >
+             <History className="h-3 w-3" />
+diff --git a/src/routes/_authenticated/live.tsx b/src/routes/_authenticated/live.tsx
+index f9aa392..1eb2c45 100644
+--- a/src/routes/_authenticated/live.tsx
++++ b/src/routes/_authenticated/live.tsx
+@@ -31,6 +31,7 @@ import { classifyLiveStatus } from "@/lib/tracking-quality";
+ import { decodePolyline } from "@/lib/google-maps-loader";
+ import { exceptionLabel, isAutoExceptionType } from "@/lib/exceptions";
+ import { detectRouteDeviation, detectUnplannedStop } from "@/lib/route-exceptions";
++import { requireRole } from "@/lib/route-guards";
+ import {
+   TIMING_STATUS_LABEL,
+   addSeconds,
+@@ -50,6 +51,7 @@ import {
+ const LiveMap = lazy(() => import("@/components/google-live-map"));
+ 
+ export const Route = createFileRoute("/_authenticated/live")({
++  beforeLoad: ({ context }) => requireRole(context.profile, ["manager", "owner"]),
+   head: () => ({
+     meta: [
+       { title: "Live operations map — DairyOne" },
+diff --git a/src/routes/_authenticated/manager.tsx b/src/routes/_authenticated/manager.tsx
+index 2de23cc..382afdb 100644
+--- a/src/routes/_authenticated/manager.tsx
++++ b/src/routes/_authenticated/manager.tsx
+@@ -8,8 +8,10 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
+ import { useStaffMcc } from "@/hooks/useStaffMcc";
+ import { exceptionLabel } from "@/lib/exceptions";
+ import { MANAGER_NAV } from "@/lib/nav";
++import { requireRole } from "@/lib/route-guards";
+ 
+ export const Route = createFileRoute("/_authenticated/manager")({
++  beforeLoad: ({ context }) => requireRole(context.profile, ["manager"]),
+   component: ManagerDashboard,
+ });
+ 
+diff --git a/src/routes/_authenticated/owner.tsx b/src/routes/_authenticated/owner.tsx
+index 802f7b2..a0f2300 100644
+--- a/src/routes/_authenticated/owner.tsx
++++ b/src/routes/_authenticated/owner.tsx
+@@ -5,8 +5,10 @@ import { supabase } from "@/integrations/supabase/client";
+ import { AppShell, PageHeading, PhaseCard, StatCard } from "@/components/app-shell";
+ import { useCurrentUser } from "@/hooks/useCurrentUser";
+ import { OWNER_NAV } from "@/lib/nav";
++import { requireRole } from "@/lib/route-guards";
+ 
+ export const Route = createFileRoute("/_authenticated/owner")({
++  beforeLoad: ({ context }) => requireRole(context.profile, ["owner"]),
+   component: OwnerDashboard,
+ });
+ 
+diff --git a/src/routes/_authenticated/quality.tsx b/src/routes/_authenticated/quality.tsx
+index d64445c..b5ea166 100644
+--- a/src/routes/_authenticated/quality.tsx
++++ b/src/routes/_authenticated/quality.tsx
+@@ -17,8 +17,10 @@ import {
+   type AlertSeverity,
+   type ScanCollection,
+ } from "@/lib/quality";
++import { requireRole } from "@/lib/route-guards";
+ 
+ export const Route = createFileRoute("/_authenticated/quality")({
++  beforeLoad: ({ context }) => requireRole(context.profile, ["manager", "owner", "accountant"]),
+   head: () => ({
+     meta: [
+       { title: "Quality alerts — DairyOne" },
+diff --git a/src/routes/_authenticated/reports.tsx b/src/routes/_authenticated/reports.tsx
+index 098b111..4f08fb8 100644
+--- a/src/routes/_authenticated/reports.tsx
++++ b/src/routes/_authenticated/reports.tsx
+@@ -23,8 +23,10 @@ import { FINANCE_NAV } from "@/lib/nav";
+ import { formatCurrency } from "@/lib/pricing";
+ import { isoDaysAgo } from "@/lib/settlement";
+ import { computeShiftMetrics, computeTrackingMetrics, formatDurationShort, type Ping } from "@/lib/trip-history";
++import { requireRole } from "@/lib/route-guards";
+ 
+ export const Route = createFileRoute("/_authenticated/reports")({
++  beforeLoad: ({ context }) => requireRole(context.profile, ["manager", "owner", "accountant"]),
+   head: () => ({
+     meta: [
+       { title: "Reports & trends — DairyOne" },
+@@ -324,6 +326,7 @@ function ReportsScreen() {
+                   key={t.id}
+                   to="/trip-history/$tripid"
+                   params={{ tripid: t.id }}
++                  search={{ from: "/reports" }}
+                   className="flex items-center justify-between rounded-lg border border-border p-3 text-sm hover:bg-muted/50"
+                 >
+                   <span>
+diff --git a/src/routes/_authenticated/route-marking.tsx b/src/routes/_authenticated/route-marking.tsx
+index 8422d26..418eb7d 100644
+--- a/src/routes/_authenticated/route-marking.tsx
++++ b/src/routes/_authenticated/route-marking.tsx
+@@ -14,8 +14,10 @@ import { useLiveLocation } from "@/hooks/useLiveLocation";
+ import { useGpsSync } from "@/hooks/useGpsSync";
+ import { useActiveTrackingSession } from "@/hooks/useActiveTrackingSession";
+ import { getCoords, haversineMeters } from "@/lib/geo";
++import { requireRole } from "@/lib/route-guards";
+ 
+ export const Route = createFileRoute("/_authenticated/route-marking")({
++  beforeLoad: ({ context }) => requireRole(context.profile, ["agent"]),
+   head: () => ({
+     meta: [
+       { title: "Mark a route — DairyOne" },
+diff --git a/src/routes/_authenticated/route.tsx b/src/routes/_authenticated/route.tsx
+index b1c1f75..b000dd4 100644
+--- a/src/routes/_authenticated/route.tsx
++++ b/src/routes/_authenticated/route.tsx
+@@ -1,12 +1,24 @@
+ import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+ import { supabase } from "@/integrations/supabase/client";
++import { CURRENT_USER_QUERY_KEY, CURRENT_USER_STALE_TIME, fetchCurrentUser } from "@/hooks/useCurrentUser";
+ 
+ export const Route = createFileRoute("/_authenticated")({
+   ssr: false,
+-  beforeLoad: async () => {
++  beforeLoad: async ({ context }) => {
+     const { data, error } = await supabase.auth.getUser();
+     if (error || !data.user) throw redirect({ to: "/auth" });
+-    return { user: data.user };
++
++    // Warm the same "current-user" react-query cache entry `useCurrentUser`
++    // reads from, so role guards (lib/route-guards.ts) have the profile/role
++    // available synchronously in every child route's `beforeLoad`, with no
++    // extra network round-trip and no flash of the wrong nav on first paint.
++    const profile = await context.queryClient.ensureQueryData({
++      queryKey: [...CURRENT_USER_QUERY_KEY],
++      queryFn: fetchCurrentUser,
++      staleTime: CURRENT_USER_STALE_TIME,
++    });
++
++    return { user: data.user, profile };
+   },
+   component: () => <Outlet />,
+ });
+diff --git a/src/routes/_authenticated/transfers.tsx b/src/routes/_authenticated/transfers.tsx
+index 512cbe4..83c54c5 100644
+--- a/src/routes/_authenticated/transfers.tsx
++++ b/src/routes/_authenticated/transfers.tsx
+@@ -20,8 +20,10 @@ import {
+ import { useStaffMcc } from "@/hooks/useStaffMcc";
+ import { useCurrentUser } from "@/hooks/useCurrentUser";
+ import { navForRole } from "@/lib/nav";
++import { requireRole } from "@/lib/route-guards";
+ 
+ export const Route = createFileRoute("/_authenticated/transfers")({
++  beforeLoad: ({ context }) => requireRole(context.profile, ["manager", "owner", "accountant"]),
+   head: () => ({
+     meta: [
+       { title: "Transfers to dairy plant — DairyOne" },
+diff --git a/src/routes/_authenticated/trip-history.$tripid.tsx b/src/routes/_authenticated/trip-history.$tripid.tsx
+index ebc44ac..bdd3ece 100644
+--- a/src/routes/_authenticated/trip-history.$tripid.tsx
++++ b/src/routes/_authenticated/trip-history.$tripid.tsx
+@@ -12,6 +12,7 @@ import {
+   LogOut,
+   Truck,
+ } from "lucide-react";
++import { z } from "zod";
+ import { AppShell, PageHeading, StatCard } from "@/components/app-shell";
+ import { Button } from "@/components/ui/button";
+ import { Badge } from "@/components/ui/badge";
+@@ -21,10 +22,23 @@ import { useTripHistory } from "@/hooks/useTripHistory";
+ import { useReplayPlayback, type ReplaySpeed } from "@/hooks/useReplayPlayback";
+ import { formatDurationShort, type TimelineEvent } from "@/lib/trip-history";
+ import { MANAGER_NAV, OWNER_NAV, FINANCE_NAV } from "@/lib/nav";
++import { requireRole } from "@/lib/route-guards";
+ 
+ const ReplayMap = lazy(() => import("@/components/replay-map"));
+ 
++// AUDIT ITEM #5 — the "Back" button used to always go to /handovers, even
++// when a manager reached this trip from the live map or from reports. The
++// linking page now tells us where it came from via ?from=, so Back can
++// return there instead of guessing. Restricted to the pages that actually
++// link here, so this can't be used as an open redirect.
++const BACK_DESTINATIONS = ["/handovers", "/reports"] as const;
++const searchSchema = z.object({
++  from: z.enum(BACK_DESTINATIONS).optional().default("/handovers"),
++});
++
+ export const Route = createFileRoute("/_authenticated/trip-history/$tripid")({
++  validateSearch: searchSchema,
++  beforeLoad: ({ context }) => requireRole(context.profile, ["manager", "owner", "accountant"]),
+   head: () => ({
+     meta: [
+       { title: "Trip history — DairyOne" },
+@@ -55,6 +69,8 @@ const TIMELINE_ICONS: Record<TimelineEvent["kind"], typeof MapPin> = {
+  */
+ function TripHistoryScreen() {
+   const { tripid } = Route.useParams();
++  const { from } = Route.useSearch();
++  const backLabel = from === "/reports" ? "Back to reports" : "Back to handovers";
+   const { data: user } = useCurrentUser();
+   const nav = user?.role === "owner" ? OWNER_NAV : user?.role === "accountant" ? FINANCE_NAV : MANAGER_NAV;
+ 
+@@ -74,9 +90,9 @@ function TripHistoryScreen() {
+       <AppShell nav={nav}>
+         <PageHeading title="Trip not found" subtitle="This trip doesn't exist or you don't have access to it." />
+         <Button asChild variant="ghost" className="mt-2">
+-          <Link to="/handovers">
++          <Link to={from}>
+             <ArrowLeft className="h-4 w-4" />
+-            Back to handovers
++            {backLabel}
+           </Link>
+         </Button>
+       </AppShell>
+@@ -100,7 +116,7 @@ function TripHistoryScreen() {
+     <AppShell nav={nav}>
+       <div className="flex items-center gap-2">
+         <Button asChild variant="ghost" size="sm">
+-          <Link to="/handovers">
++          <Link to={from}>
+             <ArrowLeft className="h-4 w-4" />
+             Back
+           </Link>
+@@ -182,7 +198,7 @@ function TripHistoryScreen() {
+               <span>{replay.endAt ? new Date(replay.endAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "—"}</span>
+             </div>
+             <div className="flex items-center justify-center gap-2">
+-              <Button size="sm" variant="outline" onClick={() => replay.restart()}>
++              <Button size="sm" variant="outline" onClick={() => replay.restart()} aria-label="Restart replay">
+                 <RotateCcw className="h-4 w-4" />
+               </Button>
+               <Button size="sm" onClick={() => (replay.playing ? replay.pause() : replay.play())}>
+diff --git a/src/routes/_authenticated/trip.tsx b/src/routes/_authenticated/trip.tsx
+index 54b099b..f556bef 100644
+--- a/src/routes/_authenticated/trip.tsx
++++ b/src/routes/_authenticated/trip.tsx
+@@ -43,6 +43,7 @@ import { getCoords } from "@/lib/geo";
+ import { computeRoute } from "@/lib/maps.functions";
+ import { QrScanner } from "@/components/qr-scanner";
+ import { cardCodeFor } from "@/lib/qr";
++import { requireRole } from "@/lib/route-guards";
+ 
+ const AgentTripMap = lazy(() => import("@/components/agent-trip-map"));
+ 
+@@ -52,6 +53,7 @@ function navigationUrl(dest: { lat: number; lng: number }) {
+ }
+ 
+ export const Route = createFileRoute("/_authenticated/trip")({
++  beforeLoad: ({ context }) => requireRole(context.profile, ["agent"]),
+   head: () => ({
+     meta: [
+       { title: "Live trip — DairyOne field collection" },

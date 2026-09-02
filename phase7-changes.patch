@@ -1,0 +1,812 @@
+From f05379a700999606d1711eec1da680c35f900936 Mon Sep 17 00:00:00 2001
+From: DairyOne Agent <agent@dairyone.local>
+Date: Wed, 26 Aug 2026 08:27:33 +0000
+Subject: [PATCH] =?UTF-8?q?LIVE=20TRACKING=20PLAN=20=E2=80=94=20Phase=207:?=
+ =?UTF-8?q?=20Route=20Deviation,=20Delays=20&=20Exceptions?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Reuses the existing trip_exceptions infrastructure (Part 1) rather than
+building a parallel system:
+
+- DB: widened trip_exceptions.type to add route_deviation, unplanned_stop,
+  delay, gps_failure, tracking_failure, sync_failure. Added lat/lng
+  (every exception now carries a location). Added a partial unique index
+  on (trip_id, type) where status='open' for the 6 new types — a real
+  DB-level guarantee against duplicate exceptions, not just an app-side
+  check. Added mcc_centres.route_deviation_threshold_m (default 300) and
+  unplanned_stop_minutes (default 5), same owner-configurable pattern as
+  Phase 5's timing thresholds.
+- src/lib/geo.ts: distanceToPathMeters() — point-to-polyline distance.
+- src/lib/route-exceptions.ts: pure detectRouteDeviation() and
+  detectUnplannedStop(), both requiring 2 consecutive pings before
+  flagging (same jitter filter as Phase 6's arrival/departure detection).
+- src/lib/exceptions.ts: single source of truth for the exception type
+  vocabulary + labels; manager.tsx's local duplicate copy removed.
+- live.tsx: detection candidates for the focused agent — deviation and
+  unplanned-stop from the new detectors; delay reuses Phase 5's
+  classification as-is; gps_failure/tracking_failure reuse
+  tracking_sessions.status/failure_reason (Phase 2) as-is. A best-effort
+  effect logs each newly-detected condition once per trip (guarded by the
+  DB unique index against races). New 'Open exceptions' panel in Agent
+  Detail with a Resolve action (status/resolved_at/resolved_by, same
+  pattern as quality.tsx's alert resolution).
+
+Known limitation (stated, not hidden): detection only runs while a
+manager has that agent focused on the live map — there is no background
+job in this architecture. sync_failure is in the type vocabulary for
+forward compatibility but has no detector yet; that's Phase 8's job,
+once an actual offline/sync queue for gps_pings exists.
+---
+ src/hooks/useLiveOps.ts                       | 103 ++++++++
+ src/integrations/supabase/types.ts            |  12 +
+ src/lib/exceptions.ts                         |  55 +++++
+ src/lib/geo.ts                                |  42 +++-
+ src/lib/route-exceptions.ts                   |  99 ++++++++
+ src/routes/_authenticated/live.tsx            | 222 +++++++++++++++++-
+ src/routes/_authenticated/manager.tsx         |  12 +-
+ ...0821130000_livetrack_phase7_exceptions.sql |  52 ++++
+ 8 files changed, 581 insertions(+), 16 deletions(-)
+ create mode 100644 src/lib/exceptions.ts
+ create mode 100644 src/lib/route-exceptions.ts
+ create mode 100644 supabase/migrations/20260821130000_livetrack_phase7_exceptions.sql
+
+diff --git a/src/hooks/useLiveOps.ts b/src/hooks/useLiveOps.ts
+index b833e84..8cb58fb 100644
+--- a/src/hooks/useLiveOps.ts
++++ b/src/hooks/useLiveOps.ts
+@@ -237,6 +237,109 @@ export function useMccTimingConfig(mccId: string | undefined) {
+   });
+ }
+ 
++/**
++ * LIVE TRACKING PLAN — PHASE 7
++ *
++ * Owner-configurable thresholds for the deviation/unplanned-stop
++ * detectors (mcc_centres.route_deviation_threshold_m /
++ * unplanned_stop_minutes) — same reuse pattern as Phase 5's timing
++ * thresholds.
++ */
++export function useMccExceptionConfig(mccId: string | undefined) {
++  return useQuery({
++    queryKey: ["mcc-exception-config", mccId],
++    enabled: Boolean(mccId),
++    staleTime: 300_000,
++    queryFn: async () => {
++      const { data } = await supabase
++        .from("mcc_centres")
++        .select("route_deviation_threshold_m, unplanned_stop_minutes")
++        .eq("id", mccId!)
++        .maybeSingle();
++      return {
++        routeDeviationThresholdM: data?.route_deviation_threshold_m ?? 300,
++        unplannedStopMinutes: data?.unplanned_stop_minutes ?? 5,
++      };
++    },
++  });
++}
++
++export type LiveTrackingSession = {
++  id: string;
++  agent_id: string;
++  status: string;
++  failure_reason: string | null;
++  last_location_at: string | null;
++};
++
++/**
++ * LIVE TRACKING PLAN — PHASE 7
++ *
++ * Today's tracking_sessions for this centre — reused as-is (Phase 2) to
++ * detect gps_failure / tracking_failure exceptions from a session that
++ * went DEGRADED, rather than re-deriving GPS-health signals separately.
++ */
++export function useLiveTrackingSessions(mccId: string | undefined) {
++  return useQuery<LiveTrackingSession[]>({
++    queryKey: ["live-tracking-sessions", mccId],
++    enabled: Boolean(mccId),
++    refetchInterval: 30_000,
++    queryFn: async () => {
++      const { data } = await supabase
++        .from("tracking_sessions")
++        .select("id, agent_id, status, failure_reason, last_location_at")
++        .eq("mcc_id", mccId!)
++        .gte("created_at", startOfToday())
++        .order("created_at", { ascending: false });
++      return (data ?? []) as LiveTrackingSession[];
++    },
++  });
++}
++
++export type LiveException = {
++  id: string;
++  trip_id: string;
++  agent_id: string;
++  route_point_id: string | null;
++  farmer_id: string | null;
++  type: string;
++  reason: string | null;
++  status: string;
++  lat: number | null;
++  lng: number | null;
++  created_at: string;
++  resolved_at: string | null;
++};
++
++/**
++ * LIVE TRACKING PLAN — PHASE 7
++ *
++ * Open exceptions for this centre — used both to render the Agent
++ * Detail panel's exception list and, client-side, to avoid attempting a
++ * redundant insert for a type that's already open on a trip (the DB's
++ * partial unique index is the real guarantee; this just saves a
++ * round-trip).
++ */
++export function useLiveExceptions(mccId: string | undefined) {
++  return useQuery<LiveException[]>({
++    queryKey: ["live-exceptions", mccId],
++    enabled: Boolean(mccId),
++    refetchInterval: 20_000,
++    queryFn: async () => {
++      const { data } = await supabase
++        .from("trip_exceptions")
++        .select(
++          "id, trip_id, agent_id, route_point_id, farmer_id, type, reason, status, lat, lng, created_at, resolved_at",
++        )
++        .eq("mcc_id", mccId!)
++        .eq("status", "open")
++        .order("created_at", { ascending: false })
++        .limit(100);
++      return (data ?? []) as LiveException[];
++    },
++  });
++}
++
+ /**
+  * LIVE TRACKING PLAN — PHASE 4
+  *
+diff --git a/src/integrations/supabase/types.ts b/src/integrations/supabase/types.ts
+index fea9d44..2b98c80 100644
+--- a/src/integrations/supabase/types.ts
++++ b/src/integrations/supabase/types.ts
+@@ -533,6 +533,8 @@ export type Database = {
+           name: string
+           on_time_threshold_min: number
+           delayed_threshold_min: number
++          route_deviation_threshold_m: number
++          unplanned_stop_minutes: number
+           state: string | null
+           updated_at: string
+           village: string | null
+@@ -551,6 +553,8 @@ export type Database = {
+           name: string
+           on_time_threshold_min?: number
+           delayed_threshold_min?: number
++          route_deviation_threshold_m?: number
++          unplanned_stop_minutes?: number
+           state?: string | null
+           updated_at?: string
+           village?: string | null
+@@ -569,6 +573,8 @@ export type Database = {
+           name?: string
+           on_time_threshold_min?: number
+           delayed_threshold_min?: number
++          route_deviation_threshold_m?: number
++          unplanned_stop_minutes?: number
+           state?: string | null
+           updated_at?: string
+           village?: string | null
+@@ -1591,6 +1597,8 @@ export type Database = {
+           created_by: string | null
+           farmer_id: string | null
+           id: string
++          lat: number | null
++          lng: number | null
+           mcc_id: string
+           reason: string | null
+           resolved_at: string | null
+@@ -1606,6 +1614,8 @@ export type Database = {
+           created_by?: string | null
+           farmer_id?: string | null
+           id?: string
++          lat?: number | null
++          lng?: number | null
+           mcc_id: string
+           reason?: string | null
+           resolved_at?: string | null
+@@ -1621,6 +1631,8 @@ export type Database = {
+           created_by?: string | null
+           farmer_id?: string | null
+           id?: string
++          lat?: number | null
++          lng?: number | null
+           mcc_id?: string
+           reason?: string | null
+           resolved_at?: string | null
+diff --git a/src/lib/exceptions.ts b/src/lib/exceptions.ts
+new file mode 100644
+index 0000000..3325d25
+--- /dev/null
++++ b/src/lib/exceptions.ts
+@@ -0,0 +1,55 @@
++/**
++ * LIVE TRACKING PLAN — PHASE 7
++ *
++ * Single source of truth for trip_exceptions.type — both the existing
++ * manually-reported types (Part 1 / Phase 3) and the tracking-derived
++ * types this phase adds. Previously duplicated as a local const in
++ * manager.tsx; centralised here so the label set can't drift.
++ */
++
++export const MANUAL_EXCEPTION_TYPES = [
++  "farmer_unavailable",
++  "farmer_skipped",
++  "route_issue",
++  "other",
++  "quality_issue",
++  "quantity_mismatch",
++] as const;
++
++/** Detected from GPS/schedule state, not typed in by an agent or manager. */
++export const AUTO_EXCEPTION_TYPES = [
++  "route_deviation",
++  "unplanned_stop",
++  "delay",
++  "gps_failure",
++  "tracking_failure",
++  "sync_failure",
++] as const;
++
++export type ManualExceptionType = (typeof MANUAL_EXCEPTION_TYPES)[number];
++export type AutoExceptionType = (typeof AUTO_EXCEPTION_TYPES)[number];
++export type ExceptionType = ManualExceptionType | AutoExceptionType;
++
++export const EXCEPTION_LABELS: Record<ExceptionType, string> = {
++  farmer_unavailable: "Farmer unavailable",
++  farmer_skipped: "Farmer skipped",
++  route_issue: "Route issue",
++  other: "Other",
++  quality_issue: "Quality issue",
++  quantity_mismatch: "MCC handover variance",
++  route_deviation: "Route deviation",
++  unplanned_stop: "Unplanned stop",
++  delay: "Delay",
++  gps_failure: "GPS failure",
++  tracking_failure: "Tracking failure",
++  sync_failure: "Sync failure",
++};
++
++/** Safe lookup for a type string coming straight off a DB row (not yet narrowed). */
++export function exceptionLabel(type: string): string {
++  return (EXCEPTION_LABELS as Record<string, string>)[type] ?? type;
++}
++
++export function isAutoExceptionType(type: string): type is AutoExceptionType {
++  return (AUTO_EXCEPTION_TYPES as readonly string[]).includes(type);
++}
+diff --git a/src/lib/geo.ts b/src/lib/geo.ts
+index 4d5ab90..4638a3a 100644
+--- a/src/lib/geo.ts
++++ b/src/lib/geo.ts
+@@ -48,10 +48,46 @@ export function haversineMeters(
+ }
+ 
+ /**
+- * Continuously watches the device position (for "am I close enough yet"
+- * geofence UI). Returns an unsubscribe function. Never throws — falls back
+- * to silently doing nothing when geolocation is unavailable.
++ * Approximate perpendicular distance (metres) from a point to the nearest
++ * segment of a path (e.g. a decoded route polyline). Projects onto each
++ * segment in an equirectangular approximation — accurate enough for
++ * deviation-threshold checks over the short segment lengths of a local
++ * delivery route; not for long geodesics.
+  */
++export function distanceToPathMeters(
++  lat: number,
++  lng: number,
++  path: { lat: number; lng: number }[],
++): number | null {
++  if (path.length === 0) return null;
++  if (path.length === 1) return haversineMeters(lat, lng, path[0]!.lat, path[0]!.lng);
++
++  const toRad = (d: number) => (d * Math.PI) / 180;
++  const latRef = toRad(lat);
++  const R = 6371000;
++  // Local equirectangular projection (metres) around the query point.
++  const toXY = (p: { lat: number; lng: number }) => ({
++    x: toRad(p.lng - lng) * Math.cos(latRef) * R,
++    y: toRad(p.lat - lat) * R,
++  });
++
++  let best = Infinity;
++  for (let i = 0; i < path.length - 1; i++) {
++    const a = toXY(path[i]!);
++    const b = toXY(path[i + 1]!);
++    const dx = b.x - a.x;
++    const dy = b.y - a.y;
++    const lenSq = dx * dx + dy * dy;
++    let t = lenSq === 0 ? 0 : (-a.x * dx - a.y * dy) / lenSq;
++    t = Math.max(0, Math.min(1, t));
++    const px = a.x + t * dx;
++    const py = a.y + t * dy;
++    const d = Math.hypot(px, py);
++    if (d < best) best = d;
++  }
++  return best;
++}
++
+ export function watchCoords(onUpdate: (c: Coords) => void): () => void {
+   if (typeof navigator === "undefined" || !navigator.geolocation) {
+     return () => {};
+diff --git a/src/lib/route-exceptions.ts b/src/lib/route-exceptions.ts
+new file mode 100644
+index 0000000..ceea076
+--- /dev/null
++++ b/src/lib/route-exceptions.ts
+@@ -0,0 +1,99 @@
++/**
++ * LIVE TRACKING PLAN — PHASE 7
++ *
++ * Pure, dependency-free detection rules for the two genuinely new
++ * tracking-derived exception types. "Delay" reuses Phase 5's timing
++ * classification directly (no new logic needed); "gps_failure" /
++ * "tracking_failure" reuse tracking_sessions.status/failure_reason
++ * (Phase 2) directly — neither needs a detector here.
++ *
++ * Both detectors require the crossing to hold for 2 consecutive usable
++ * pings, mirroring Phase 6's arrival/departure jitter filter, so ordinary
++ * GPS noise near a threshold doesn't raise a false exception.
++ */
++
++import { distanceToPathMeters, haversineMeters } from "@/lib/geo";
++
++export type DetectorPing = {
++  lat: number | null;
++  lng: number | null;
++  recorded_at: string;
++  quality: string | null;
++};
++
++function usable(pings: DetectorPing[]): { lat: number; lng: number; recorded_at: string }[] {
++  const out: { lat: number; lng: number; recorded_at: string }[] = [];
++  for (const p of pings) {
++    if (p.lat != null && p.lng != null && p.quality !== "unavailable") {
++      out.push({ lat: p.lat, lng: p.lng, recorded_at: p.recorded_at });
++    }
++  }
++  return out;
++}
++
++export type DeviationResult = { at: Date; lat: number; lng: number; distanceM: number };
++
++/** Ping trail must be chronologically ascending. */
++export function detectRouteDeviation(
++  pings: DetectorPing[],
++  routePath: { lat: number; lng: number }[],
++  thresholdM: number,
++): DeviationResult | null {
++  if (routePath.length < 2) return null;
++  const pts = usable(pings);
++  for (let i = 0; i < pts.length - 1; i++) {
++    const d0 = distanceToPathMeters(pts[i]!.lat, pts[i]!.lng, routePath);
++    const d1 = distanceToPathMeters(pts[i + 1]!.lat, pts[i + 1]!.lng, routePath);
++    if (d0 != null && d1 != null && d0 > thresholdM && d1 > thresholdM) {
++      return {
++        at: new Date(pts[i]!.recorded_at),
++        lat: pts[i]!.lat,
++        lng: pts[i]!.lng,
++        distanceM: d0,
++      };
++    }
++  }
++  return null;
++}
++
++export type UnplannedStopResult = { since: Date; lat: number; lng: number };
++
++/**
++ * Flags a stationary cluster of recent pings that isn't near any known
++ * stop or the MCC. "Stationary" = every ping in the trailing window is
++ * within `clusterRadiusM` of the latest one; "unknown" = the latest fix
++ * is further than `knownPlaceRadiusM` from every point in `knownPlaces`.
++ */
++export function detectUnplannedStop(
++  pings: DetectorPing[],
++  knownPlaces: { lat: number; lng: number }[],
++  minMinutes: number,
++  clusterRadiusM = 50,
++  knownPlaceRadiusM = 150,
++): UnplannedStopResult | null {
++  const pts = usable(pings);
++  if (pts.length < 2) return null;
++
++  const last = pts[pts.length - 1]!;
++  const cutoff = new Date(last.recorded_at).getTime() - minMinutes * 60_000;
++
++  let windowStart = -1;
++  for (let i = pts.length - 1; i >= 0; i--) {
++    const p = pts[i]!;
++    if (new Date(p.recorded_at).getTime() < cutoff) break;
++    const d = haversineMeters(p.lat, p.lng, last.lat, last.lng) ?? Infinity;
++    if (d > clusterRadiusM) return null; // moved during the window — not stationary
++    windowStart = i;
++  }
++  if (windowStart === -1) return null; // not enough history to cover the full window yet
++
++  const first = pts[windowStart]!;
++  if (new Date(first.recorded_at).getTime() > cutoff + 60_000) return null; // window too short
++
++  const nearKnownPlace = knownPlaces.some(
++    (kp) => (haversineMeters(last.lat, last.lng, kp.lat, kp.lng) ?? Infinity) <= knownPlaceRadiusM,
++  );
++  if (nearKnownPlace) return null;
++
++  return { since: new Date(first.recorded_at), lat: last.lat, lng: last.lng };
++}
+diff --git a/src/routes/_authenticated/live.tsx b/src/routes/_authenticated/live.tsx
+index a622748..f9aa392 100644
+--- a/src/routes/_authenticated/live.tsx
++++ b/src/routes/_authenticated/live.tsx
+@@ -1,9 +1,11 @@
+-import { Suspense, lazy, useMemo, useState } from "react";
++import { Suspense, lazy, useEffect, useMemo, useState } from "react";
+ import { createFileRoute } from "@tanstack/react-router";
+ import { Activity, Gauge, MapPinned, Milk, Navigation, Radio, Users } from "lucide-react";
+ import { ClientOnly } from "@tanstack/react-router";
+-import { useQuery } from "@tanstack/react-query";
++import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+ import { useServerFn } from "@tanstack/react-start";
++import { toast } from "sonner";
++import { supabase } from "@/integrations/supabase/client";
+ import { AppShell, PageHeading, StatCard } from "@/components/app-shell";
+ import { Badge } from "@/components/ui/badge";
+ import { Button } from "@/components/ui/button";
+@@ -11,9 +13,12 @@ import { useStaffMcc } from "@/hooks/useStaffMcc";
+ import {
+   useCentreLocation,
+   useLiveCollections,
++  useLiveExceptions,
+   useLiveOpsRealtime,
+   useLivePings,
++  useLiveTrackingSessions,
+   useLiveTrips,
++  useMccExceptionConfig,
+   useMccTimingConfig,
+   useRoutePointFarmers,
+   useRoutePoints,
+@@ -21,8 +26,11 @@ import {
+ import { computeRoute } from "@/lib/maps.functions";
+ import { formatCurrency } from "@/lib/pricing";
+ import { MANAGER_NAV } from "@/lib/nav";
+-import { haversineMeters } from "@/lib/geo";
++import { distanceToPathMeters, haversineMeters } from "@/lib/geo";
+ import { classifyLiveStatus } from "@/lib/tracking-quality";
++import { decodePolyline } from "@/lib/google-maps-loader";
++import { exceptionLabel, isAutoExceptionType } from "@/lib/exceptions";
++import { detectRouteDeviation, detectUnplannedStop } from "@/lib/route-exceptions";
+ import {
+   TIMING_STATUS_LABEL,
+   addSeconds,
+@@ -83,6 +91,10 @@ function LiveOpsScreen() {
+   const { data: collections } = useLiveCollections(mccId);
+   const { data: centre } = useCentreLocation(mccId);
+   const { data: timingConfig } = useMccTimingConfig(mccId);
++  const { data: exceptionConfig } = useMccExceptionConfig(mccId);
++  const { data: trackingSessions } = useLiveTrackingSessions(mccId);
++  const { data: openExceptions } = useLiveExceptions(mccId);
++  const queryClient = useQueryClient();
+ 
+   const tripList = trips ?? [];
+   const pingList = useMemo(() => pings ?? [], [pings]);
+@@ -379,6 +391,173 @@ function LiveOpsScreen() {
+       : null;
+   const mccDelayMin = scheduledMccAt && mccEtaAt ? minutesBetween(scheduledMccAt, mccEtaAt) : null;
+ 
++  /*
++   * LIVE TRACKING PLAN — PHASE 7: Route Deviation, Delays & Exceptions
++   *
++   * Detection candidates for the focused agent, built entirely from data
++   * already loaded above (Phases 4-6) plus the two Phase 7 config
++   * thresholds. "Delay" reuses Phase 5's classification as-is. GPS/
++   * tracking failure reuse tracking_sessions.status (Phase 2) as-is.
++   * Deviation and unplanned-stop run the new pure detectors over this
++   * trip's own ping trail. Nothing here writes anything by itself — see
++   * the effect below.
++   */
++  const openExceptionsForTrip = useMemo(
++    () => (focusedTrip ? (openExceptions ?? []).filter((e) => e.trip_id === focusedTrip.id) : []),
++    [openExceptions, focusedTrip],
++  );
++  const openTypesForTrip = useMemo(
++    () => new Set(openExceptionsForTrip.map((e) => e.type)),
++    [openExceptionsForTrip],
++  );
++
++  const routePath = useMemo(
++    () => (directions.data ? decodePolyline(directions.data.polyline) : []),
++    [directions.data],
++  );
++  const deviation = useMemo(
++    () =>
++      focusedTrip?.status === "in_progress" && routePath.length >= 2
++        ? detectRouteDeviation(
++            tripPingTrail,
++            routePath,
++            exceptionConfig?.routeDeviationThresholdM ?? 300,
++          )
++        : null,
++    [tripPingTrail, routePath, focusedTrip, exceptionConfig],
++  );
++
++  const knownPlaces = useMemo(() => {
++    const places = routeStopsFull.map((p) => ({ lat: p.lat!, lng: p.lng! }));
++    if (centre?.lat != null && centre?.lng != null)
++      places.push({ lat: centre.lat, lng: centre.lng });
++    return places;
++  }, [routeStopsFull, centre]);
++  const unplannedStop = useMemo(
++    () =>
++      focusedTrip?.status === "in_progress"
++        ? detectUnplannedStop(
++            tripPingTrail,
++            knownPlaces,
++            exceptionConfig?.unplannedStopMinutes ?? 5,
++          )
++        : null,
++    [tripPingTrail, knownPlaces, focusedTrip, exceptionConfig],
++  );
++
++  const delayCandidate =
++    nearMccPhase && mccDelayMin != null && mccDelayMin > (timingConfig?.delayedThresholdMin ?? 15)
++      ? { reason: `Running ${formatDelay(mccDelayMin)} against the scheduled MCC arrival.` }
++      : nextTimingStatus === "DELAYED" && nextDelayMin != null && upcomingFarmer
++        ? {
++            reason: `Running ${formatDelay(nextDelayMin)} for the next stop (${upcomingFarmer.full_name}).`,
++          }
++        : null;
++
++  const trackingSessionForAgent = focusAgentId
++    ? (trackingSessions ?? []).find((s) => s.agent_id === focusAgentId)
++    : null;
++  const gpsFailureCandidate =
++    trackingSessionForAgent?.status === "DEGRADED" && trackingSessionForAgent.failure_reason
++      ? {
++          type: (["permission_denied", "gps_disabled", "location_unavailable"].includes(
++            trackingSessionForAgent.failure_reason,
++          )
++            ? "gps_failure"
++            : "tracking_failure") as "gps_failure" | "tracking_failure",
++          reason: `Tracking session degraded: ${trackingSessionForAgent.failure_reason.replace(/_/g, " ")}.`,
++        }
++      : null;
++
++  const logException = useMutation({
++    mutationFn: async (input: {
++      type: string;
++      reason: string;
++      lat: number | null;
++      lng: number | null;
++    }) => {
++      if (!focusedTrip || !mccId) return;
++      const { error } = await supabase.from("trip_exceptions").insert({
++        trip_id: focusedTrip.id,
++        agent_id: focusedTrip.agent_id,
++        mcc_id: mccId,
++        type: input.type,
++        reason: input.reason,
++        lat: input.lat,
++        lng: input.lng,
++      });
++      // 23505 = the DB's partial unique index already has this trip/type
++      // open — another detection pass beat us to it. Not an error.
++      if (error && error.code !== "23505") throw error;
++    },
++    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["live-exceptions"] }),
++  });
++
++  // Fire-and-forget: raise each detected condition once per trip, only if
++  // nothing of that type is already open. Best-effort — this only runs
++  // while a manager has this agent focused on the live map; there is no
++  // background job in this architecture (see Known limitations).
++  useEffect(() => {
++    if (!focusedTrip || logException.isPending) return;
++    if (deviation && !openTypesForTrip.has("route_deviation")) {
++      logException.mutate({
++        type: "route_deviation",
++        reason: `${Math.round(deviation.distanceM)}m off the planned route.`,
++        lat: deviation.lat,
++        lng: deviation.lng,
++      });
++    } else if (unplannedStop && !openTypesForTrip.has("unplanned_stop")) {
++      logException.mutate({
++        type: "unplanned_stop",
++        reason: "Stationary away from any known stop or the MCC.",
++        lat: unplannedStop.lat,
++        lng: unplannedStop.lng,
++      });
++    } else if (delayCandidate && !openTypesForTrip.has("delay")) {
++      logException.mutate({
++        type: "delay",
++        reason: delayCandidate.reason,
++        lat: focusedPing?.lat ?? null,
++        lng: focusedPing?.lng ?? null,
++      });
++    } else if (gpsFailureCandidate && !openTypesForTrip.has(gpsFailureCandidate.type)) {
++      logException.mutate({
++        type: gpsFailureCandidate.type,
++        reason: gpsFailureCandidate.reason,
++        lat: focusedPing?.lat ?? null,
++        lng: focusedPing?.lng ?? null,
++      });
++    }
++    // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, [
++    focusedTrip?.id,
++    deviation,
++    unplannedStop,
++    delayCandidate,
++    gpsFailureCandidate,
++    openTypesForTrip,
++  ]);
++
++  const resolveException = useMutation({
++    mutationFn: async (id: string) => {
++      const { data: auth } = await supabase.auth.getUser();
++      const { error } = await supabase
++        .from("trip_exceptions")
++        .update({
++          status: "resolved",
++          resolved_at: new Date().toISOString(),
++          resolved_by: auth.user?.id ?? null,
++        })
++        .eq("id", id);
++      if (error) throw error;
++    },
++    onSuccess: () => {
++      void queryClient.invalidateQueries({ queryKey: ["live-exceptions"] });
++      toast.success("Exception resolved");
++    },
++    onError: (error: Error) => toast.error(error.message),
++  });
++
+   return (
+     <AppShell nav={MANAGER_NAV}>
+       <PageHeading
+@@ -713,6 +892,43 @@ function LiveOpsScreen() {
+                   </dl>
+                 </div>
+               )}
++
++              {/* LIVE TRACKING PLAN — PHASE 7: open exceptions for this trip */}
++              {openExceptionsForTrip.length > 0 && (
++                <div className="mt-3 rounded-lg border border-destructive/30 p-3">
++                  <p className="mb-2 text-xs font-semibold text-destructive">
++                    Open exceptions ({openExceptionsForTrip.length})
++                  </p>
++                  <ul className="space-y-2">
++                    {openExceptionsForTrip.map((e) => (
++                      <li key={e.id} className="flex items-start justify-between gap-3 text-sm">
++                        <div>
++                          <p className="font-medium">
++                            {exceptionLabel(e.type)}
++                            {isAutoExceptionType(e.type) && (
++                              <span className="ml-1.5 text-[10px] font-normal uppercase tracking-wide text-muted-foreground">
++                                auto-detected
++                              </span>
++                            )}
++                          </p>
++                          <p className="text-xs text-muted-foreground">
++                            {e.reason ?? "—"} · {timeAgo(e.created_at)}
++                          </p>
++                        </div>
++                        <Button
++                          size="sm"
++                          variant="outline"
++                          className="shrink-0"
++                          disabled={resolveException.isPending}
++                          onClick={() => resolveException.mutate(e.id)}
++                        >
++                          Resolve
++                        </Button>
++                      </li>
++                    ))}
++                  </ul>
++                </div>
++              )}
+             </div>
+           )}
+ 
+diff --git a/src/routes/_authenticated/manager.tsx b/src/routes/_authenticated/manager.tsx
+index 76f583d..2de23cc 100644
+--- a/src/routes/_authenticated/manager.tsx
++++ b/src/routes/_authenticated/manager.tsx
+@@ -6,17 +6,9 @@ import { AppShell, PageHeading, PhaseCard, StatCard } from "@/components/app-she
+ import { Badge } from "@/components/ui/badge";
+ import { useCurrentUser } from "@/hooks/useCurrentUser";
+ import { useStaffMcc } from "@/hooks/useStaffMcc";
++import { exceptionLabel } from "@/lib/exceptions";
+ import { MANAGER_NAV } from "@/lib/nav";
+ 
+-const EXCEPTION_LABELS: Record<string, string> = {
+-  farmer_unavailable: "Farmer unavailable",
+-  farmer_skipped: "Farmer skipped",
+-  route_issue: "Route issue",
+-  other: "Other",
+-  quality_issue: "Quality issue",
+-  quantity_mismatch: "MCC handover variance",
+-};
+-
+ export const Route = createFileRoute("/_authenticated/manager")({
+   component: ManagerDashboard,
+ });
+@@ -123,7 +115,7 @@ function ManagerDashboard() {
+             {exceptions.map((e) => (
+               <li key={e.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                 <div>
+-                  <p className="font-medium">{EXCEPTION_LABELS[e.type] ?? e.type}</p>
++                  <p className="font-medium">{exceptionLabel(e.type)}</p>
+                   <p className="text-xs text-muted-foreground">
+                     {e.agents?.full_name ?? "Agent"}
+                     {e.reason ? ` — ${e.reason}` : ""}
+diff --git a/supabase/migrations/20260821130000_livetrack_phase7_exceptions.sql b/supabase/migrations/20260821130000_livetrack_phase7_exceptions.sql
+new file mode 100644
+index 0000000..7576c00
+--- /dev/null
++++ b/supabase/migrations/20260821130000_livetrack_phase7_exceptions.sql
+@@ -0,0 +1,52 @@
++-- LIVE TRACKING PLAN — PHASE 7: Route Deviation, Delays & Exceptions
++--
++-- "Use existing DairyOne exception infrastructure if present." It is
++-- present (trip_exceptions, since Part 1 / Phase 3) — this extends it
++-- rather than creating a parallel system.
++--
++-- NOTE: applied directly to the live project (uuhhyzxagzswcjfhngom) via
++-- apply_migration under the same name. This file mirrors that migration
++-- for repo history.
++
++-- 1. Widen the type vocabulary to the 6 tracking-related exception types.
++alter table public.trip_exceptions drop constraint trip_exceptions_type_check;
++alter table public.trip_exceptions add constraint trip_exceptions_type_check
++  check (type = any (array[
++    'farmer_unavailable', 'farmer_skipped', 'route_issue', 'other',
++    'quality_issue', 'quantity_mismatch',
++    'route_deviation', 'unplanned_stop', 'delay', 'gps_failure',
++    'tracking_failure', 'sync_failure'
++  ]));
++
++-- 2. "Location" — the spec requires every exception to carry a location.
++-- The existing manual types (farmer_unavailable etc.) don't currently
++-- record one; the new tracking-derived types always will.
++alter table public.trip_exceptions add column lat double precision;
++alter table public.trip_exceptions add column lng double precision;
++
++-- 3. Auto-detected exceptions are derived from live GPS/schedule state
++-- (computed in the app, not a background job) each time a manager has an
++-- agent focused on the live map. Without this, a flaky detection re-run
++-- would insert duplicate open exceptions of the same kind for the same
++-- trip. This is a hard DB-level guarantee, not just an app-side check.
++create unique index trip_exceptions_auto_open_unique
++  on public.trip_exceptions (trip_id, type)
++  where status = 'open' and type in (
++    'route_deviation', 'unplanned_stop', 'delay', 'gps_failure',
++    'tracking_failure', 'sync_failure'
++  );
++
++-- 4. Owner-configurable thresholds for the two genuinely new detection
++-- rules (deviation distance, unplanned-stop duration) — same reuse
++-- pattern as Phase 5's timing thresholds. Delay detection reuses those
++-- existing on_time/delayed thresholds; gps_failure/tracking_failure reuse
++-- tracking_sessions.status/failure_reason (Phase 2) as-is, no new config
++-- needed for them.
++alter table public.mcc_centres
++  add column route_deviation_threshold_m integer not null default 300,
++  add column unplanned_stop_minutes integer not null default 5;
++
++comment on column public.trip_exceptions.lat is 'Where the exception was detected/reported. Required for tracking-derived types (route_deviation, unplanned_stop, gps_failure, tracking_failure); optional for manually-reported types.';
++comment on column public.trip_exceptions.lng is 'See lat.';
++comment on column public.mcc_centres.route_deviation_threshold_m is 'Perpendicular distance from the planned route polyline (metres) that counts as a genuine deviation, not GPS noise. Owner-configurable.';
++comment on column public.mcc_centres.unplanned_stop_minutes is 'Minutes an agent must remain stationary away from any known stop/MCC before it is flagged as an unplanned stop. Owner-configurable.';
+-- 
+2.43.0
+

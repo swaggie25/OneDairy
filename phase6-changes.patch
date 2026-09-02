@@ -1,0 +1,352 @@
+From f0d297fd8e6913f67da78d8bb34328dabda6831d Mon Sep 17 00:00:00 2001
+From: DairyOne Agent <agent@dairyone.local>
+Date: Tue, 25 Aug 2026 06:17:52 +0000
+Subject: [PATCH] =?UTF-8?q?LIVE=20TRACKING=20PLAN=20=E2=80=94=20Phase=206:?=
+ =?UTF-8?q?=20Farmer=20Arrival,=20Departure=20&=20Stop=20Intelligence?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- src/lib/stop-intelligence.ts: pure deriveStopVisit() — walks a trip's
+  own gps_pings trail (already collected in Phase 3) and finds when the
+  agent crossed a stop's geofence (route_points.geofence_radius_m,
+  falling back to mcc_centres.default_geofence_radius_m — no hard-coded
+  radius). Requires 2 consecutive fixes on each side of the crossing to
+  absorb GPS jitter, and ignores 'unavailable'-quality fixes rather than
+  treating them as exact (Phase 3 rule).
+- useLiveOps.ts: route_points select now includes geofence_radius_m;
+  milk_collections select now includes trip_id/route_point_id/
+  distance_from_point_m (no new table — existing collection records are
+  reused, not duplicated, per the plan).
+- live.tsx: new 'Current stop' panel in Agent Detail — Arrived /
+  Collection completed (from milk_collections, matched by trip_id +
+  route_point_id) / Departed / Stop duration / Travel time to reach
+  (from the previous stop's derived departure, or trip start for the
+  first stop).
+
+No new DB migration this phase — every field needed (geofence_radius_m,
+default_geofence_radius_m, trip_id, route_point_id, distance_from_point_m)
+already existed. Deliberately independent of trip.tsx's existing 'arrive'
+mutation (a manual 'View farmers' tap, not a location signal) and never
+touches milk_collections — GPS provides context only, the collection
+stays a separate transaction.
+---
+ src/hooks/useLiveOps.ts            |  10 ++-
+ src/lib/stop-intelligence.ts       | 104 +++++++++++++++++++++++++
+ src/routes/_authenticated/live.tsx | 119 ++++++++++++++++++++++++++++-
+ 3 files changed, 229 insertions(+), 4 deletions(-)
+ create mode 100644 src/lib/stop-intelligence.ts
+
+diff --git a/src/hooks/useLiveOps.ts b/src/hooks/useLiveOps.ts
+index ec5bd04..b833e84 100644
+--- a/src/hooks/useLiveOps.ts
++++ b/src/hooks/useLiveOps.ts
+@@ -37,6 +37,9 @@ export type LiveCollection = {
+   risk_score: number | null;
+   gps_lat: number | null;
+   gps_lng: number | null;
++  trip_id: string | null;
++  route_point_id: string | null;
++  distance_from_point_m: number | null;
+   farmers: { full_name: string; farmer_code: string } | null;
+   agents: { full_name: string } | null;
+ };
+@@ -48,6 +51,7 @@ export type LiveRoutePoint = {
+   sequence: number;
+   lat: number | null;
+   lng: number | null;
++  geofence_radius_m: number | null;
+ };
+ 
+ export type LiveRoutePointFarmer = {
+@@ -155,7 +159,7 @@ export function useLiveCollections(mccId: string | undefined) {
+       const { data } = await supabase
+         .from("milk_collections")
+         .select(
+-          "id, quantity_litres, total_amount, status, collected_at, risk_score, gps_lat, gps_lng, farmers(full_name, farmer_code), agents(full_name)",
++          "id, quantity_litres, total_amount, status, collected_at, risk_score, gps_lat, gps_lng, trip_id, route_point_id, distance_from_point_m, farmers(full_name, farmer_code), agents(full_name)",
+         )
+         .eq("mcc_id", mccId!)
+         .gte("collected_at", startOfToday())
+@@ -181,7 +185,7 @@ export function useRoutePoints(mccId: string | undefined) {
+       if (ids.length === 0) return [];
+       const { data } = await supabase
+         .from("route_points")
+-        .select("id, route_id, name, sequence, lat, lng")
++        .select("id, route_id, name, sequence, lat, lng, geofence_radius_m")
+         .in("route_id", ids)
+         .order("sequence");
+       return (data ?? []) as LiveRoutePoint[];
+@@ -197,7 +201,7 @@ export function useCentreLocation(mccId: string | undefined) {
+     queryFn: async () => {
+       const { data } = await supabase
+         .from("mcc_centres")
+-        .select("name, lat, lng")
++        .select("name, lat, lng, default_geofence_radius_m")
+         .eq("id", mccId!)
+         .maybeSingle();
+       return data;
+diff --git a/src/lib/stop-intelligence.ts b/src/lib/stop-intelligence.ts
+new file mode 100644
+index 0000000..f23b01b
+--- /dev/null
++++ b/src/lib/stop-intelligence.ts
+@@ -0,0 +1,104 @@
++/**
++ * LIVE TRACKING PLAN — PHASE 6
++ *
++ * Farmer arrival / departure / stop-duration, derived from the real GPS
++ * ping trail (Phase 3) rather than a manual button tap. Pure and
++ * dependency-free so it's unit-testable and reusable by Phase 9 (trail /
++ * replay / reports) without duplicating the detection logic.
++ *
++ * IMPORTANT (per the plan): this NEVER creates or touches a milk
++ * collection. It only reads gps_pings + route_points.geofence_radius_m
++ * (already stored) and, separately, milk_collections for display context.
++ * GPS provides operational context; the collection stays a distinct,
++ * manually-entered transaction.
++ */
++
++import { haversineMeters } from "@/lib/geo";
++
++export type StopPing = {
++  lat: number | null;
++  lng: number | null;
++  recorded_at: string;
++  quality: string | null;
++};
++
++export type StopVisit = {
++  /** First moment the agent was confirmed inside the geofence (2 consecutive fixes). */
++  arrivedAt: Date | null;
++  /** First moment the agent was confirmed to have left, after arriving. Null = still there / never left. */
++  departedAt: Date | null;
++};
++
++/**
++ * A ping counts toward geofence math only if it has coordinates and isn't
++ * flagged "unavailable" quality — per Phase 3, "do not treat poor-quality
++ * GPS as exact." Pings without an accuracy fix at all are excluded rather
++ * than assumed to be inside/outside.
++ */
++function isUsable(p: StopPing): p is StopPing & { lat: number; lng: number } {
++  return p.lat != null && p.lng != null && p.quality !== "unavailable";
++}
++
++/**
++ * Walks a trip's chronologically-ordered ping trail and finds when the
++ * agent entered and left a stop's geofence. Requires two consecutive
++ * pings on each side of the crossing to absorb ordinary GPS jitter near
++ * the boundary (a single stray fix doesn't count as arrival or departure).
++ */
++export function deriveStopVisit(
++  pings: StopPing[],
++  point: { lat: number | null; lng: number | null; geofence_radius_m: number | null },
++  defaultRadiusM: number,
++): StopVisit {
++  if (point.lat == null || point.lng == null) return { arrivedAt: null, departedAt: null };
++  const targetLat = point.lat;
++  const targetLng = point.lng;
++  const radius = point.geofence_radius_m ?? defaultRadiusM;
++
++  const usable: { lat: number; lng: number; recorded_at: string }[] = [];
++  for (const p of pings) {
++    if (isUsable(p)) usable.push({ lat: p.lat, lng: p.lng, recorded_at: p.recorded_at });
++  }
++  const inside = usable.map(
++    (p) => (haversineMeters(p.lat, p.lng, targetLat, targetLng) ?? Infinity) <= radius,
++  );
++
++  let arrivedAt: Date | null = null;
++  let arrivedIndex = -1;
++  for (let i = 0; i < usable.length - 1; i++) {
++    if (inside[i] && inside[i + 1]) {
++      arrivedAt = new Date(usable[i]!.recorded_at);
++      arrivedIndex = i;
++      break;
++    }
++  }
++  if (!arrivedAt) return { arrivedAt: null, departedAt: null };
++
++  let departedAt: Date | null = null;
++  for (let i = arrivedIndex + 1; i < usable.length - 1; i++) {
++    if (!inside[i] && !inside[i + 1]) {
++      departedAt = new Date(usable[i]!.recorded_at);
++      break;
++    }
++  }
++
++  return { arrivedAt, departedAt };
++}
++
++export function stopDurationSeconds(visit: StopVisit, now: Date = new Date()): number | null {
++  if (!visit.arrivedAt) return null;
++  const end = visit.departedAt ?? now;
++  return Math.max(0, Math.round((end.getTime() - visit.arrivedAt.getTime()) / 1000));
++}
++
++export function travelTimeSeconds(from: Date | null, arrivedAt: Date | null): number | null {
++  if (!from || !arrivedAt) return null;
++  return Math.max(0, Math.round((arrivedAt.getTime() - from.getTime()) / 1000));
++}
++
++export function formatDurationShort(totalSeconds: number): string {
++  const m = Math.floor(totalSeconds / 60);
++  const s = totalSeconds % 60;
++  if (m === 0) return `${s}s`;
++  return `${m}m ${s}s`;
++}
+diff --git a/src/routes/_authenticated/live.tsx b/src/routes/_authenticated/live.tsx
+index dfc0d92..a622748 100644
+--- a/src/routes/_authenticated/live.tsx
++++ b/src/routes/_authenticated/live.tsx
+@@ -32,6 +32,12 @@ import {
+   formatDelay,
+   minutesBetween,
+ } from "@/lib/route-intelligence";
++import {
++  deriveStopVisit,
++  formatDurationShort,
++  stopDurationSeconds,
++  travelTimeSeconds,
++} from "@/lib/stop-intelligence";
+ 
+ const LiveMap = lazy(() => import("@/components/google-live-map"));
+ 
+@@ -79,7 +85,7 @@ function LiveOpsScreen() {
+   const { data: timingConfig } = useMccTimingConfig(mccId);
+ 
+   const tripList = trips ?? [];
+-  const pingList = pings ?? [];
++  const pingList = useMemo(() => pings ?? [], [pings]);
+   const collectionList = useMemo(() => collections ?? [], [collections]);
+   const active = tripList.filter((t) => t.status === "in_progress");
+   const litres = collectionList.reduce((s, c) => s + Number(c.quantity_litres ?? 0), 0);
+@@ -161,6 +167,69 @@ function LiveOpsScreen() {
+       ? haversineMeters(focusedPing.lat, focusedPing.lng, nextFarmerPoint.lat, nextFarmerPoint.lng)
+       : null;
+ 
++  const currentFarmerPoint = currentFarmer
++    ? (routePointsForFocusedRoute.find((p) => p.id === currentFarmer.route_point_id) ?? null)
++    : null;
++
++  /*
++   * LIVE TRACKING PLAN — PHASE 6: farmer arrival / departure / stop duration
++   *
++   * Derived entirely from this trip's own ping trail (already loaded
++   * above, Phase 3) crossing the stop's geofence — route_points'
++   * geofence_radius_m, falling back to the centre's configured
++   * default_geofence_radius_m (Phase 1 config), never a hard-coded
++   * number. This is deliberately independent of the "View farmers" tap
++   * in the agent app (trip.tsx's `arrive` mutation) — that's a manual UI
++   * action, not a location signal, and per the plan a GPS arrival must
++   * never touch the collection workflow either way.
++   */
++  const tripPingTrail = useMemo(() => {
++    if (!focusedTrip) return [];
++    return pingList
++      .filter((p) => p.trip_id === focusedTrip.id)
++      .map((p) => ({ lat: p.lat, lng: p.lng, recorded_at: p.recorded_at, quality: p.quality }));
++  }, [pingList, focusedTrip]);
++
++  const defaultRadiusM = centre?.default_geofence_radius_m ?? 150;
++
++  const currentStopIndex = currentFarmerPoint
++    ? routePointsForFocusedRoute.findIndex((p) => p.id === currentFarmerPoint.id)
++    : -1;
++  const previousStopPoint =
++    currentStopIndex > 0 ? (routePointsForFocusedRoute[currentStopIndex - 1] ?? null) : null;
++
++  const previousStopVisit = useMemo(
++    () =>
++      previousStopPoint ? deriveStopVisit(tripPingTrail, previousStopPoint, defaultRadiusM) : null,
++    [tripPingTrail, previousStopPoint, defaultRadiusM],
++  );
++  const currentStopVisit = useMemo(
++    () =>
++      currentFarmerPoint
++        ? deriveStopVisit(tripPingTrail, currentFarmerPoint, defaultRadiusM)
++        : null,
++    [tripPingTrail, currentFarmerPoint, defaultRadiusM],
++  );
++
++  // Collections logged at this stop, for this trip — reused, not duplicated.
++  const currentStopCollections = useMemo(() => {
++    if (!focusedTrip || !currentFarmerPoint) return [];
++    return collectionList.filter(
++      (c) => c.trip_id === focusedTrip.id && c.route_point_id === currentFarmerPoint.id,
++    );
++  }, [collectionList, focusedTrip, currentFarmerPoint]);
++  const lastCollectionAt = currentStopCollections.length
++    ? new Date(Math.max(...currentStopCollections.map((c) => new Date(c.collected_at).getTime())))
++    : null;
++
++  const travelToCurrentStopFrom =
++    previousStopVisit?.departedAt ??
++    (currentStopIndex === 0 && focusedTrip?.started_at ? new Date(focusedTrip.started_at) : null);
++  const travelTimeToCurrentSec = currentStopVisit
++    ? travelTimeSeconds(travelToCurrentStopFrom, currentStopVisit.arrivedAt)
++    : null;
++  const currentStopDurationSec = currentStopVisit ? stopDurationSeconds(currentStopVisit) : null;
++
+   // Stops for the directions request: focused agent's route, else every active stop.
+   const focusedRouteId = focusAgentId
+     ? (tripList.find((t) => t.agent_id === focusAgentId)?.route_id ?? null)
+@@ -515,6 +584,54 @@ function LiveOpsScreen() {
+                 <dd className="text-right font-medium">{focusedLive.label}</dd>
+               </dl>
+ 
++              {/* LIVE TRACKING PLAN — PHASE 6: arrival / departure / stop duration for the current stop */}
++              {currentFarmerPoint && (
++                <div className="mt-3 rounded-lg border border-border p-3">
++                  <p className="mb-2 text-xs font-semibold text-muted-foreground">
++                    Current stop — {currentFarmerPoint.name}
++                  </p>
++                  <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-sm">
++                    <dt className="text-muted-foreground">Arrived</dt>
++                    <dd className="text-right font-medium">
++                      {currentStopVisit?.arrivedAt ? formatClock(currentStopVisit.arrivedAt) : "—"}
++                    </dd>
++
++                    <dt className="text-muted-foreground">Collection completed</dt>
++                    <dd className="text-right font-medium">
++                      {lastCollectionAt ? formatClock(lastCollectionAt) : "—"}
++                    </dd>
++
++                    <dt className="text-muted-foreground">Departed</dt>
++                    <dd className="text-right font-medium">
++                      {currentStopVisit?.departedAt
++                        ? formatClock(currentStopVisit.departedAt)
++                        : currentStopVisit?.arrivedAt
++                          ? "Still here"
++                          : "—"}
++                    </dd>
++
++                    <dt className="text-muted-foreground">Stop duration</dt>
++                    <dd className="text-right font-medium">
++                      {currentStopDurationSec != null
++                        ? formatDurationShort(currentStopDurationSec)
++                        : "—"}
++                    </dd>
++
++                    <dt className="text-muted-foreground">Travel time to reach</dt>
++                    <dd className="text-right font-medium">
++                      {travelTimeToCurrentSec != null
++                        ? formatDurationShort(travelTimeToCurrentSec)
++                        : "—"}
++                    </dd>
++                  </dl>
++                  {!currentStopVisit?.arrivedAt && (
++                    <p className="mt-2 text-xs text-muted-foreground">
++                      No GPS confirmation of arrival at this stop yet.
++                    </p>
++                  )}
++                </div>
++              )}
++
+               {/* LIVE TRACKING PLAN — PHASE 5: schedule / ETA / delay for the next stop */}
+               {upcomingFarmer && (
+                 <div className="mt-3 rounded-lg border border-border p-3">
+-- 
+2.43.0
+

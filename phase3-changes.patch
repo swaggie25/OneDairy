@@ -1,0 +1,2717 @@
+diff --git a/package-lock.json b/package-lock.json
+index 37a38f7..2f76e4b 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1088,9 +1088,6 @@
+         "arm64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1108,9 +1105,6 @@
+         "arm64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1128,9 +1122,6 @@
+         "ppc64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1148,9 +1139,6 @@
+         "riscv64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1168,9 +1156,6 @@
+         "riscv64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1188,9 +1173,6 @@
+         "s390x"
+       ],
+       "dev": true,
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1208,9 +1190,6 @@
+         "x64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1228,9 +1207,6 @@
+         "x64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -2735,9 +2711,6 @@
+       "cpu": [
+         "arm64"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -2754,9 +2727,6 @@
+       "cpu": [
+         "arm64"
+       ],
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -2773,9 +2743,6 @@
+       "cpu": [
+         "ppc64"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -2792,9 +2759,6 @@
+       "cpu": [
+         "s390x"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -2811,9 +2775,6 @@
+       "cpu": [
+         "x64"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -2830,9 +2791,6 @@
+       "cpu": [
+         "x64"
+       ],
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -3155,9 +3113,6 @@
+       "cpu": [
+         "arm64"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -3178,9 +3133,6 @@
+       "cpu": [
+         "arm64"
+       ],
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -3201,9 +3153,6 @@
+       "cpu": [
+         "x64"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -3224,9 +3173,6 @@
+       "cpu": [
+         "x64"
+       ],
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -3390,9 +3336,6 @@
+       "cpu": [
+         "arm64"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -3409,9 +3352,6 @@
+       "cpu": [
+         "arm64"
+       ],
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -3428,9 +3368,6 @@
+       "cpu": [
+         "x64"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -3447,9 +3384,6 @@
+       "cpu": [
+         "x64"
+       ],
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -6264,9 +6198,6 @@
+       "cpu": [
+         "arm64"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -6287,9 +6218,6 @@
+       "cpu": [
+         "arm64"
+       ],
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -6310,9 +6238,6 @@
+       "cpu": [
+         "x64"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -6333,9 +6258,6 @@
+       "cpu": [
+         "x64"
+       ],
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -6573,6 +6495,18 @@
+         }
+       }
+     },
++    "node_modules/nitro/node_modules/lru-cache": {
++      "version": "11.5.2",
++      "resolved": "https://registry.npmjs.org/lru-cache/-/lru-cache-11.5.2.tgz",
++      "integrity": "sha512-4pfM1Ff0x50o0tQwb5ucw/RzNyD0/YJME6IVcStalZuMWxdt3sR3huStTtxz4PUmvZfRguvDejasvQ2kifR11g==",
++      "dev": true,
++      "license": "BlueOak-1.0.0",
++      "optional": true,
++      "peer": true,
++      "engines": {
++        "node": "20 || >=22"
++      }
++    },
+     "node_modules/nitro/node_modules/unstorage": {
+       "version": "2.0.0-alpha.7",
+       "resolved": "https://registry.npmjs.org/unstorage/-/unstorage-2.0.0-alpha.7.tgz",
+diff --git a/src/integrations/supabase/types.ts b/src/integrations/supabase/types.ts
+index 8023042..83530f8 100644
+--- a/src/integrations/supabase/types.ts
++++ b/src/integrations/supabase/types.ts
+@@ -7,8 +7,6 @@ export type Json =
+   | Json[]
+ 
+ export type Database = {
+-  // Allows to automatically instantiate createClient with right options
+-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+   __InternalSupabase: {
+     PostgrestVersion: "14.15"
+   }
+@@ -49,20 +47,8 @@ export type Database = {
+           updated_at?: string
+         }
+         Relationships: [
+-          {
+-            foreignKeyName: "agents_mcc_id_fkey"
+-            columns: ["mcc_id"]
+-            isOneToOne: false
+-            referencedRelation: "mcc_centres"
+-            referencedColumns: ["id"]
+-          },
+-          {
+-            foreignKeyName: "agents_profile_id_fkey"
+-            columns: ["profile_id"]
+-            isOneToOne: false
+-            referencedRelation: "profiles"
+-            referencedColumns: ["id"]
+-          },
++          { foreignKeyName: "agents_mcc_id_fkey"; columns: ["mcc_id"]; isOneToOne: false; referencedRelation: "mcc_centres"; referencedColumns: ["id"] },
++          { foreignKeyName: "agents_profile_id_fkey"; columns: ["profile_id"]; isOneToOne: false; referencedRelation: "profiles"; referencedColumns: ["id"] },
+         ]
+       }
+       attendance: {
+@@ -106,27 +92,9 @@ export type Database = {
+           route_id?: string | null
+         }
+         Relationships: [
+-          {
+-            foreignKeyName: "attendance_agent_id_fkey"
+-            columns: ["agent_id"]
+-            isOneToOne: false
+-            referencedRelation: "agents"
+-            referencedColumns: ["id"]
+-          },
+-          {
+-            foreignKeyName: "attendance_mcc_id_fkey"
+-            columns: ["mcc_id"]
+-            isOneToOne: false
+-            referencedRelation: "mcc_centres"
+-            referencedColumns: ["id"]
+-          },
+-          {
+-            foreignKeyName: "attendance_route_id_fkey"
+-            columns: ["route_id"]
+-            isOneToOne: false
+-            referencedRelation: "routes"
+-            referencedColumns: ["id"]
+-          },
++          { foreignKeyName: "attendance_agent_id_fkey"; columns: ["agent_id"]; isOneToOne: false; referencedRelation: "agents"; referencedColumns: ["id"] },
++          { foreignKeyName: "attendance_mcc_id_fkey"; columns: ["mcc_id"]; isOneToOne: false; referencedRelation: "mcc_centres"; referencedColumns: ["id"] },
++          { foreignKeyName: "attendance_route_id_fkey"; columns: ["route_id"]; isOneToOne: false; referencedRelation: "routes"; referencedColumns: ["id"] },
+         ]
+       }
+       buyers: {
+@@ -167,13 +135,7 @@ export type Database = {
+           updated_at?: string
+         }
+         Relationships: [
+-          {
+-            foreignKeyName: "buyers_profile_id_fkey"
+-            columns: ["profile_id"]
+-            isOneToOne: false
+-            referencedRelation: "profiles"
+-            referencedColumns: ["id"]
+-          },
++          { foreignKeyName: "buyers_profile_id_fkey"; columns: ["profile_id"]; isOneToOne: false; referencedRelation: "profiles"; referencedColumns: ["id"] },
+         ]
+       }
+       complaints: {
+@@ -220,20 +182,8 @@ export type Database = {
+           updated_at?: string
+         }
+         Relationships: [
+-          {
+-            foreignKeyName: "complaints_farmer_id_fkey"
+-            columns: ["farmer_id"]
+-            isOneToOne: false
+-            referencedRelation: "farmers"
+-            referencedColumns: ["id"]
+-          },
+-          {
+-            foreignKeyName: "complaints_mcc_id_fkey"
+-            columns: ["mcc_id"]
+-            isOneToOne: false
+-            referencedRelation: "mcc_centres"
+-            referencedColumns: ["id"]
+-          },
++          { foreignKeyName: "complaints_farmer_id_fkey"; columns: ["farmer_id"]; isOneToOne: false; referencedRelation: "farmers"; referencedColumns: ["id"] },
++          { foreignKeyName: "complaints_mcc_id_fkey"; columns: ["mcc_id"]; isOneToOne: false; referencedRelation: "mcc_centres"; referencedColumns: ["id"] },
+         ]
+       }
+       farmer_animals: {
+@@ -262,13 +212,7 @@ export type Database = {
+           id?: string
+         }
+         Relationships: [
+-          {
+-            foreignKeyName: "farmer_animals_farmer_id_fkey"
+-            columns: ["farmer_id"]
+-            isOneToOne: false
+-            referencedRelation: "farmers"
+-            referencedColumns: ["id"]
+-          },
++          { foreignKeyName: "farmer_animals_farmer_id_fkey"; columns: ["farmer_id"]; isOneToOne: false; referencedRelation: "farmers"; referencedColumns: ["id"] },
+         ]
+       }
+       farmers: {
+@@ -321,20 +265,8 @@ export type Database = {
+           village?: string | null
+         }
+         Relationships: [
+-          {
+-            foreignKeyName: "farmers_mcc_id_fkey"
+-            columns: ["mcc_id"]
+-            isOneToOne: false
+-            referencedRelation: "mcc_centres"
+-            referencedColumns: ["id"]
+-          },
+-          {
+-            foreignKeyName: "farmers_profile_id_fkey"
+-            columns: ["profile_id"]
+-            isOneToOne: false
+-            referencedRelation: "profiles"
+-            referencedColumns: ["id"]
+-          },
++          { foreignKeyName: "farmers_mcc_id_fkey"; columns: ["mcc_id"]; isOneToOne: false; referencedRelation: "mcc_centres"; referencedColumns: ["id"] },
++          { foreignKeyName: "farmers_profile_id_fkey"; columns: ["profile_id"]; isOneToOne: false; referencedRelation: "profiles"; referencedColumns: ["id"] },
+         ]
+       }
+       forecasts: {
+@@ -417,34 +349,10 @@ export type Database = {
+           trip_id?: string | null
+         }
+         Relationships: [
+-          {
+-            foreignKeyName: "gps_pings_agent_id_fkey"
+-            columns: ["agent_id"]
+-            isOneToOne: false
+-            referencedRelation: "agents"
+-            referencedColumns: ["id"]
+-          },
+-          {
+-            foreignKeyName: "gps_pings_mcc_id_fkey"
+-            columns: ["mcc_id"]
+-            isOneToOne: false
+-            referencedRelation: "mcc_centres"
+-            referencedColumns: ["id"]
+-          },
+-          {
+-            foreignKeyName: "gps_pings_route_point_id_fkey"
+-            columns: ["route_point_id"]
+-            isOneToOne: false
+-            referencedRelation: "route_points"
+-            referencedColumns: ["id"]
+-          },
+-          {
+-            foreignKeyName: "gps_pings_trip_id_fkey"
+-            columns: ["trip_id"]
+-            isOneToOne: false
+-            referencedRelation: "route_trips"
+-            referencedColumns: ["id"]
+-          },
++          { foreignKeyName: "gps_pings_agent_id_fkey"; columns: ["agent_id"]; isOneToOne: false; referencedRelation: "agents"; referencedColumns: ["id"] },
++          { foreignKeyName: "gps_pings_mcc_id_fkey"; columns: ["mcc_id"]; isOneToOne: false; referencedRelation: "mcc_centres"; referencedColumns: ["id"] },
++          { foreignKeyName: "gps_pings_route_point_id_fkey"; columns: ["route_point_id"]; isOneToOne: false; referencedRelation: "route_points"; referencedColumns: ["id"] },
++          { foreignKeyName: "gps_pings_trip_id_fkey"; columns: ["trip_id"]; isOneToOne: false; referencedRelation: "route_trips"; referencedColumns: ["id"] },
+         ]
+       }
+       ledger_entries: {
+@@ -488,13 +396,7 @@ export type Database = {
+           ref_type?: string | null
+         }
+         Relationships: [
+-          {
+-            foreignKeyName: "ledger_entries_mcc_id_fkey"
+-            columns: ["mcc_id"]
+-            isOneToOne: false
+-            referencedRelation: "mcc_centres"
+-            referencedColumns: ["id"]
+-          },
++          { foreignKeyName: "ledger_entries_mcc_id_fkey"; columns: ["mcc_id"]; isOneToOne: false; referencedRelation: "mcc_centres"; referencedColumns: ["id"] },
+         ]
+       }
+       mcc_centres: {
+@@ -504,6 +406,7 @@ export type Database = {
+           created_at: string
+           default_geofence_radius_m: number
+           district: string | null
++          handover_variance_tolerance_litres: number
+           id: string
+           lat: number | null
+           lng: number | null
+@@ -519,6 +422,7 @@ export type Database = {
+           created_at?: string
+           default_geofence_radius_m?: number
+           district?: string | null
++          handover_variance_tolerance_litres?: number
+           id?: string
+           lat?: number | null
+           lng?: number | null
+@@ -534,6 +438,7 @@ export type Database = {
+           created_at?: string
+           default_geofence_radius_m?: number
+           district?: string | null
++          handover_variance_tolerance_litres?: number
+           id?: string
+           lat?: number | null
+           lng?: number | null
+@@ -545,6 +450,79 @@ export type Database = {
+         }
+         Relationships: []
+       }
++      mcc_handovers: {
++        Row: {
++          agent_id: string
++          created_at: string
++          created_by: string | null
++          declared_collection_count: number
++          declared_quantity_litres: number
++          id: string
++          mcc_id: string
++          receipt_notes: string | null
++          received_at: string | null
++          received_by: string | null
++          received_quantity_litres: number | null
++          session: string
++          status: string
++          trip_date: string
++          trip_id: string
++          updated_at: string
++          variance_acknowledged_at: string | null
++          variance_acknowledged_by: string | null
++          variance_litres: number | null
++          variance_reason: string | null
++        }
++        Insert: {
++          agent_id: string
++          created_at?: string
++          created_by?: string | null
++          declared_collection_count?: number
++          declared_quantity_litres: number
++          id?: string
++          mcc_id: string
++          receipt_notes?: string | null
++          received_at?: string | null
++          received_by?: string | null
++          received_quantity_litres?: number | null
++          session?: string
++          status?: string
++          trip_date: string
++          trip_id: string
++          updated_at?: string
++          variance_acknowledged_at?: string | null
++          variance_acknowledged_by?: string | null
++          variance_litres?: number | null
++          variance_reason?: string | null
++        }
++        Update: {
++          agent_id?: string
++          created_at?: string
++          created_by?: string | null
++          declared_collection_count?: number
++          declared_quantity_litres?: number
++          id?: string
++          mcc_id?: string
++          receipt_notes?: string | null
++          received_at?: string | null
++          received_by?: string | null
++          received_quantity_litres?: number | null
++          session?: string
++          status?: string
++          trip_date?: string
++          trip_id?: string
++          updated_at?: string
++          variance_acknowledged_at?: string | null
++          variance_acknowledged_by?: string | null
++          variance_litres?: number | null
++          variance_reason?: string | null
++        }
++        Relationships: [
++          { foreignKeyName: "mcc_handovers_agent_id_fkey"; columns: ["agent_id"]; isOneToOne: false; referencedRelation: "agents"; referencedColumns: ["id"] },
++          { foreignKeyName: "mcc_handovers_mcc_id_fkey"; columns: ["mcc_id"]; isOneToOne: false; referencedRelation: "mcc_centres"; referencedColumns: ["id"] },
++          { foreignKeyName: "mcc_handovers_trip_id_fkey"; columns: ["trip_id"]; isOneToOne: true; referencedRelation: "route_trips"; referencedColumns: ["id"] },
++        ]
++      }
+       milk_collections: {
+         Row: {
+           acidity: number | null
+@@ -667,41 +645,11 @@ export type Database = {
+           water_adulteration_pct?: number | null
+         }
+         Relationships: [
+-          {
+-            foreignKeyName: "milk_collections_agent_id_fkey"
+-            columns: ["agent_id"]
+-            isOneToOne: false
+-            referencedRelation: "agents"
+-            referencedColumns: ["id"]
+-          },
+-          {
+-            foreignKeyName: "milk_collections_farmer_id_fkey"
+-            columns: ["farmer_id"]
+-            isOneToOne: false
+-            referencedRelation: "farmers"
+-            referencedColumns: ["id"]
+-          },
+-          {
+-            foreignKeyName: "milk_collections_mcc_id_fkey"
+-            columns: ["mcc_id"]
+-            isOneToOne: false
+-            referencedRelation: "mcc_centres"
+-            referencedColumns: ["id"]
+-          },
+-          {
+-            foreignKeyName: "milk_collections_route_point_id_fkey"
+-            columns: ["route_point_id"]
+-            isOneToOne: false
+-            referencedRelation: "route_points"
+-            referencedColumns: ["id"]
+-          },
+-          {
+-            foreignKeyName: "milk_collections_trip_id_fkey"
+-            columns: ["trip_id"]
+-            isOneToOne: false
+-            referencedRelation: "route_trips"
+-            referencedColumns: ["id"]
+-          },
++          { foreignKeyName: "milk_collections_agent_id_fkey"; columns: ["agent_id"]; isOneToOne: false; referencedRelation: "agents"; referencedColumns: ["id"] },
++          { foreignKeyName: "milk_collections_farmer_id_fkey"; columns: ["farmer_id"]; isOneToOne: false; referencedRelation: "farmers"; referencedColumns: ["id"] },
++          { foreignKeyName: "milk_collections_mcc_id_fkey"; columns: ["mcc_id"]; isOneToOne: false; referencedRelation: "mcc_centres"; referencedColumns: ["id"] },
++          { foreignKeyName: "milk_collections_route_point_id_fkey"; columns: ["route_point_id"]; isOneToOne: false; referencedRelation: "route_points"; referencedColumns: ["id"] },
++          { foreignKeyName: "milk_collections_trip_id_fkey"; columns: ["trip_id"]; isOneToOne: false; referencedRelation: "route_trips"; referencedColumns: ["id"] },
+         ]
+       }
+       otp_codes: {
+@@ -793,27 +741,9 @@ export type Database = {
+           updated_at?: string
+         }
+         Relationships: [
+-          {
+-            foreignKeyName: "payments_farmer_id_fkey"
+-            columns: ["farmer_id"]
+-            isOneToOne: false
+-            referencedRelation: "farmers"
+-            referencedColumns: ["id"]
+-          },
+-          {
+-            foreignKeyName: "payments_mcc_id_fkey"
+-            columns: ["mcc_id"]
+-            isOneToOne: false
+-            referencedRelation: "mcc_centres"
+-            referencedColumns: ["id"]
+-          },
+-          {
+-            foreignKeyName: "payments_settlement_run_id_fkey"
+-            columns: ["settlement_run_id"]
+-            isOneToOne: false
+-            referencedRelation: "settlement_runs"
+-            referencedColumns: ["id"]
+-          },
++          { foreignKeyName: "payments_farmer_id_fkey"; columns: ["farmer_id"]; isOneToOne: false; referencedRelation: "farmers"; referencedColumns: ["id"] },
++          { foreignKeyName: "payments_mcc_id_fkey"; columns: ["mcc_id"]; isOneToOne: false; referencedRelation: "mcc_centres"; referencedColumns: ["id"] },
++          { foreignKeyName: "payments_settlement_run_id_fkey"; columns: ["settlement_run_id"]; isOneToOne: false; referencedRelation: "settlement_runs"; referencedColumns: ["id"] },
+         ]
+       }
+       profiles: {
+@@ -881,13 +811,7 @@ export type Database = {
+           mcc_id?: string | null
+         }
+         Relationships: [
+-          {
+-            foreignKeyName: "qr_cards_mcc_id_fkey"
+-            columns: ["mcc_id"]
+-            isOneToOne: false
+-            referencedRelation: "mcc_centres"
+-            referencedColumns: ["id"]
+-          },
++          { foreignKeyName: "qr_cards_mcc_id_fkey"; columns: ["mcc_id"]; isOneToOne: false; referencedRelation: "mcc_centres"; referencedColumns: ["id"] },
+         ]
+       }
+       quality_alerts: {
+@@ -934,27 +858,9 @@ export type Database = {
+           updated_at?: string
+         }
+         Relationships: [
+-          {
+-            foreignKeyName: "quality_alerts_collection_id_fkey"
+-            columns: ["collection_id"]
+-            isOneToOne: false
+-            referencedRelation: "milk_collections"
+-            referencedColumns: ["id"]
+-          },
+-          {
+-            foreignKeyName: "quality_alerts_farmer_id_fkey"
+-            columns: ["farmer_id"]
+-            isOneToOne: false
+-            referencedRelation: "farmers"
+-            referencedColumns: ["id"]
+-          },
+-          {
+-            foreignKeyName: "quality_alerts_mcc_id_fkey"
+-            columns: ["mcc_id"]
+-            isOneToOne: false
+-            referencedRelation: "mcc_centres"
+-            referencedColumns: ["id"]
+-          },
++          { foreignKeyName: "quality_alerts_collection_id_fkey"; columns: ["collection_id"]; isOneToOne: false; referencedRelation: "milk_collections"; referencedColumns: ["id"] },
++          { foreignKeyName: "quality_alerts_farmer_id_fkey"; columns: ["farmer_id"]; isOneToOne: false; referencedRelation: "farmers"; referencedColumns: ["id"] },
++          { foreignKeyName: "quality_alerts_mcc_id_fkey"; columns: ["mcc_id"]; isOneToOne: false; referencedRelation: "mcc_centres"; referencedColumns: ["id"] },
+         ]
+       }
+       quality_tests: {
+@@ -1001,13 +907,7 @@ export type Database = {
+           water_adulteration_pct?: number | null
+         }
+         Relationships: [
+-          {
+-            foreignKeyName: "quality_tests_collection_id_fkey"
+-            columns: ["collection_id"]
+-            isOneToOne: false
+-            referencedRelation: "milk_collections"
+-            referencedColumns: ["id"]
+-          },
++          { foreignKeyName: "quality_tests_collection_id_fkey"; columns: ["collection_id"]; isOneToOne: false; referencedRelation: "milk_collections"; referencedColumns: ["id"] },
+         ]
+       }
+       rate_slabs: {
+@@ -1048,13 +948,7 @@ export type Database = {
+           rate_per_litre?: number
+         }
+         Relationships: [
+-          {
+-            foreignKeyName: "rate_slabs_mcc_id_fkey"
+-            columns: ["mcc_id"]
+-            isOneToOne: false
+-            referencedRelation: "mcc_centres"
+-            referencedColumns: ["id"]
+-          },
++          { foreignKeyName: "rate_slabs_mcc_id_fkey"; columns: ["mcc_id"]; isOneToOne: false; referencedRelation: "mcc_centres"; referencedColumns: ["id"] },
+         ]
+       }
+       route_assignments: {
+@@ -1104,27 +998,9 @@ export type Database = {
+           vehicle_type?: string
+         }
+         Relationships: [
+-          {
+-            foreignKeyName: "route_assignments_agent_id_fkey"
+-            columns: ["agent_id"]
+-            isOneToOne: false
+-            referencedRelation: "agents"
+-            referencedColumns: ["id"]
+-          },
+-          {
+-            foreignKeyName: "route_assignments_mcc_id_fkey"
+-            columns: ["mcc_id"]
+-            isOneToOne: false
+-            referencedRelation: "mcc_centres"
+-            referencedColumns: ["id"]
+-          },
+-          {
+-            foreignKeyName: "route_assignments_route_id_fkey"
+-            columns: ["route_id"]
+-            isOneToOne: false
+-            referencedRelation: "routes"
+-            referencedColumns: ["id"]
+-          },
++          { foreignKeyName: "route_assignments_agent_id_fkey"; columns: ["agent_id"]; isOneToOne: false; referencedRelation: "agents"; referencedColumns: ["id"] },
++          { foreignKeyName: "route_assignments_mcc_id_fkey"; columns: ["mcc_id"]; isOneToOne: false; referencedRelation: "mcc_centres"; referencedColumns: ["id"] },
++          { foreignKeyName: "route_assignments_route_id_fkey"; columns: ["route_id"]; isOneToOne: false; referencedRelation: "routes"; referencedColumns: ["id"] },
+         ]
+       }
+       route_change_requests: {
+@@ -1192,41 +1068,11 @@ export type Database = {
+           voice_transcription?: string | null
+         }
+         Relationships: [
+-          {
+-            foreignKeyName: "route_change_requests_agent_id_fkey"
+-            columns: ["agent_id"]
+-            isOneToOne: false
+-            referencedRelation: "agents"
+-            referencedColumns: ["id"]
+-          },
+-          {
+-            foreignKeyName: "route_change_requests_deviation_id_fkey"
+-            columns: ["deviation_id"]
+-            isOneToOne: false
+-            referencedRelation: "route_deviations"
+-            referencedColumns: ["id"]
+-          },
+-          {
+-            foreignKeyName: "route_change_requests_mcc_id_fkey"
+-            columns: ["mcc_id"]
+-            isOneToOne: false
+-            referencedRelation: "mcc_centres"
+-            referencedColumns: ["id"]
+-          },
+-          {
+-            foreignKeyName: "route_change_requests_original_route_id_fkey"
+-            columns: ["original_route_id"]
+-            isOneToOne: false
+-            referencedRelation: "routes"
+-            referencedColumns: ["id"]
+-          },
+-          {
+-            foreignKeyName: "route_change_requests_trip_id_fkey"
+-            columns: ["trip_id"]
+-            isOneToOne: false
+-            referencedRelation: "route_trips"
+-            referencedColumns: ["id"]
+-          },
++          { foreignKeyName: "route_change_requests_agent_id_fkey"; columns: ["agent_id"]; isOneToOne: false; referencedRelation: "agents"; referencedColumns: ["id"] },
++          { foreignKeyName: "route_change_requests_deviation_id_fkey"; columns: ["deviation_id"]; isOneToOne: false; referencedRelation: "route_deviations"; referencedColumns: ["id"] },
++          { foreignKeyName: "route_change_requests_mcc_id_fkey"; columns: ["mcc_id"]; isOneToOne: false; referencedRelation: "mcc_centres"; referencedColumns: ["id"] },
++          { foreignKeyName: "route_change_requests_original_route_id_fkey"; columns: ["original_route_id"]; isOneToOne: false; referencedRelation: "routes"; referencedColumns: ["id"] },
++          { foreignKeyName: "route_change_requests_trip_id_fkey"; columns: ["trip_id"]; isOneToOne: false; referencedRelation: "route_trips"; referencedColumns: ["id"] },
+         ]
+       }
+       route_deviations: {
+@@ -1285,27 +1131,9 @@ export type Database = {
+           voice_transcription?: string | null
+         }
+         Relationships: [
+-          {
+-            foreignKeyName: "route_deviations_agent_id_fkey"
+-            columns: ["agent_id"]
+-            isOneToOne: false
+-            referencedRelation: "agents"
+-            referencedColumns: ["id"]
+-          },
+-          {
+-            foreignKeyName: "route_deviations_mcc_id_fkey"
+-            columns: ["mcc_id"]
+-            isOneToOne: false
+-            referencedRelation: "mcc_centres"
+-            referencedColumns: ["id"]
+-          },
+-          {
+-            foreignKeyName: "route_deviations_trip_id_fkey"
+-            columns: ["trip_id"]
+-            isOneToOne: false
+-            referencedRelation: "route_trips"
+-            referencedColumns: ["id"]
+-          },
++          { foreignKeyName: "route_deviations_agent_id_fkey"; columns: ["agent_id"]; isOneToOne: false; referencedRelation: "agents"; referencedColumns: ["id"] },
++          { foreignKeyName: "route_deviations_mcc_id_fkey"; columns: ["mcc_id"]; isOneToOne: false; referencedRelation: "mcc_centres"; referencedColumns: ["id"] },
++          { foreignKeyName: "route_deviations_trip_id_fkey"; columns: ["trip_id"]; isOneToOne: false; referencedRelation: "route_trips"; referencedColumns: ["id"] },
+         ]
+       }
+       route_point_farmers: {
+@@ -1328,20 +1156,8 @@ export type Database = {
+           sequence?: number
+         }
+         Relationships: [
+-          {
+-            foreignKeyName: "route_point_farmers_farmer_id_fkey"
+-            columns: ["farmer_id"]
+-            isOneToOne: false
+-            referencedRelation: "farmers"
+-            referencedColumns: ["id"]
+-          },
+-          {
+-            foreignKeyName: "route_point_farmers_route_point_id_fkey"
+-            columns: ["route_point_id"]
+-            isOneToOne: false
+-            referencedRelation: "route_points"
+-            referencedColumns: ["id"]
+-          },
++          { foreignKeyName: "route_point_farmers_farmer_id_fkey"; columns: ["farmer_id"]; isOneToOne: false; referencedRelation: "farmers"; referencedColumns: ["id"] },
++          { foreignKeyName: "route_point_farmers_route_point_id_fkey"; columns: ["route_point_id"]; isOneToOne: false; referencedRelation: "route_points"; referencedColumns: ["id"] },
+         ]
+       }
+       route_points: {
+@@ -1376,13 +1192,7 @@ export type Database = {
+           sequence?: number
+         }
+         Relationships: [
+-          {
+-            foreignKeyName: "route_points_route_id_fkey"
+-            columns: ["route_id"]
+-            isOneToOne: false
+-            referencedRelation: "routes"
+-            referencedColumns: ["id"]
+-          },
++          { foreignKeyName: "route_points_route_id_fkey"; columns: ["route_id"]; isOneToOne: false; referencedRelation: "routes"; referencedColumns: ["id"] },
+         ]
+       }
+       route_trips: {
+@@ -1450,41 +1260,11 @@ export type Database = {
+           vehicle_type?: string
+         }
+         Relationships: [
+-          {
+-            foreignKeyName: "route_trips_agent_id_fkey"
+-            columns: ["agent_id"]
+-            isOneToOne: false
+-            referencedRelation: "agents"
+-            referencedColumns: ["id"]
+-          },
+-          {
+-            foreignKeyName: "route_trips_current_route_point_id_fkey"
+-            columns: ["current_route_point_id"]
+-            isOneToOne: false
+-            referencedRelation: "route_points"
+-            referencedColumns: ["id"]
+-          },
+-          {
+-            foreignKeyName: "route_trips_mcc_id_fkey"
+-            columns: ["mcc_id"]
+-            isOneToOne: false
+-            referencedRelation: "mcc_centres"
+-            referencedColumns: ["id"]
+-          },
+-          {
+-            foreignKeyName: "route_trips_route_assignment_id_fkey"
+-            columns: ["route_assignment_id"]
+-            isOneToOne: false
+-            referencedRelation: "route_assignments"
+-            referencedColumns: ["id"]
+-          },
+-          {
+-            foreignKeyName: "route_trips_route_id_fkey"
+-            columns: ["route_id"]
+-            isOneToOne: false
+-            referencedRelation: "routes"
+-            referencedColumns: ["id"]
+-          },
++          { foreignKeyName: "route_trips_agent_id_fkey"; columns: ["agent_id"]; isOneToOne: false; referencedRelation: "agents"; referencedColumns: ["id"] },
++          { foreignKeyName: "route_trips_current_route_point_id_fkey"; columns: ["current_route_point_id"]; isOneToOne: false; referencedRelation: "route_points"; referencedColumns: ["id"] },
++          { foreignKeyName: "route_trips_mcc_id_fkey"; columns: ["mcc_id"]; isOneToOne: false; referencedRelation: "mcc_centres"; referencedColumns: ["id"] },
++          { foreignKeyName: "route_trips_route_assignment_id_fkey"; columns: ["route_assignment_id"]; isOneToOne: false; referencedRelation: "route_assignments"; referencedColumns: ["id"] },
++          { foreignKeyName: "route_trips_route_id_fkey"; columns: ["route_id"]; isOneToOne: false; referencedRelation: "routes"; referencedColumns: ["id"] },
+         ]
+       }
+       routes: {
+@@ -1540,27 +1320,9 @@ export type Database = {
+           updated_at?: string
+         }
+         Relationships: [
+-          {
+-            foreignKeyName: "routes_assigned_agent_id_fkey"
+-            columns: ["assigned_agent_id"]
+-            isOneToOne: false
+-            referencedRelation: "agents"
+-            referencedColumns: ["id"]
+-          },
+-          {
+-            foreignKeyName: "routes_created_from_trip_id_fkey"
+-            columns: ["created_from_trip_id"]
+-            isOneToOne: false
+-            referencedRelation: "route_trips"
+-            referencedColumns: ["id"]
+-          },
+-          {
+-            foreignKeyName: "routes_mcc_id_fkey"
+-            columns: ["mcc_id"]
+-            isOneToOne: false
+-            referencedRelation: "mcc_centres"
+-            referencedColumns: ["id"]
+-          },
++          { foreignKeyName: "routes_assigned_agent_id_fkey"; columns: ["assigned_agent_id"]; isOneToOne: false; referencedRelation: "agents"; referencedColumns: ["id"] },
++          { foreignKeyName: "routes_created_from_trip_id_fkey"; columns: ["created_from_trip_id"]; isOneToOne: false; referencedRelation: "route_trips"; referencedColumns: ["id"] },
++          { foreignKeyName: "routes_mcc_id_fkey"; columns: ["mcc_id"]; isOneToOne: false; referencedRelation: "mcc_centres"; referencedColumns: ["id"] },
+         ]
+       }
+       settlement_runs: {
+@@ -1607,13 +1369,7 @@ export type Database = {
+           updated_at?: string
+         }
+         Relationships: [
+-          {
+-            foreignKeyName: "settlement_runs_mcc_id_fkey"
+-            columns: ["mcc_id"]
+-            isOneToOne: false
+-            referencedRelation: "mcc_centres"
+-            referencedColumns: ["id"]
+-          },
++          { foreignKeyName: "settlement_runs_mcc_id_fkey"; columns: ["mcc_id"]; isOneToOne: false; referencedRelation: "mcc_centres"; referencedColumns: ["id"] },
+         ]
+       }
+       transfer_collections: {
+@@ -1636,20 +1392,8 @@ export type Database = {
+           transfer_id?: string
+         }
+         Relationships: [
+-          {
+-            foreignKeyName: "transfer_collections_collection_id_fkey"
+-            columns: ["collection_id"]
+-            isOneToOne: true
+-            referencedRelation: "milk_collections"
+-            referencedColumns: ["id"]
+-          },
+-          {
+-            foreignKeyName: "transfer_collections_transfer_id_fkey"
+-            columns: ["transfer_id"]
+-            isOneToOne: false
+-            referencedRelation: "transfers"
+-            referencedColumns: ["id"]
+-          },
++          { foreignKeyName: "transfer_collections_collection_id_fkey"; columns: ["collection_id"]; isOneToOne: true; referencedRelation: "milk_collections"; referencedColumns: ["id"] },
++          { foreignKeyName: "transfer_collections_transfer_id_fkey"; columns: ["transfer_id"]; isOneToOne: false; referencedRelation: "transfers"; referencedColumns: ["id"] },
+         ]
+       }
+       transfers: {
+@@ -1711,20 +1455,8 @@ export type Database = {
+           vehicle_no?: string | null
+         }
+         Relationships: [
+-          {
+-            foreignKeyName: "transfers_buyer_id_fkey"
+-            columns: ["buyer_id"]
+-            isOneToOne: false
+-            referencedRelation: "buyers"
+-            referencedColumns: ["id"]
+-          },
+-          {
+-            foreignKeyName: "transfers_mcc_id_fkey"
+-            columns: ["mcc_id"]
+-            isOneToOne: false
+-            referencedRelation: "mcc_centres"
+-            referencedColumns: ["id"]
+-          },
++          { foreignKeyName: "transfers_buyer_id_fkey"; columns: ["buyer_id"]; isOneToOne: false; referencedRelation: "buyers"; referencedColumns: ["id"] },
++          { foreignKeyName: "transfers_mcc_id_fkey"; columns: ["mcc_id"]; isOneToOne: false; referencedRelation: "mcc_centres"; referencedColumns: ["id"] },
+         ]
+       }
+       trip_exceptions: {
+@@ -1774,41 +1506,11 @@ export type Database = {
+           type?: string
+         }
+         Relationships: [
+-          {
+-            foreignKeyName: "trip_exceptions_agent_id_fkey"
+-            columns: ["agent_id"]
+-            isOneToOne: false
+-            referencedRelation: "agents"
+-            referencedColumns: ["id"]
+-          },
+-          {
+-            foreignKeyName: "trip_exceptions_farmer_id_fkey"
+-            columns: ["farmer_id"]
+-            isOneToOne: false
+-            referencedRelation: "farmers"
+-            referencedColumns: ["id"]
+-          },
+-          {
+-            foreignKeyName: "trip_exceptions_mcc_id_fkey"
+-            columns: ["mcc_id"]
+-            isOneToOne: false
+-            referencedRelation: "mcc_centres"
+-            referencedColumns: ["id"]
+-          },
+-          {
+-            foreignKeyName: "trip_exceptions_route_point_id_fkey"
+-            columns: ["route_point_id"]
+-            isOneToOne: false
+-            referencedRelation: "route_points"
+-            referencedColumns: ["id"]
+-          },
+-          {
+-            foreignKeyName: "trip_exceptions_trip_id_fkey"
+-            columns: ["trip_id"]
+-            isOneToOne: false
+-            referencedRelation: "route_trips"
+-            referencedColumns: ["id"]
+-          },
++          { foreignKeyName: "trip_exceptions_agent_id_fkey"; columns: ["agent_id"]; isOneToOne: false; referencedRelation: "agents"; referencedColumns: ["id"] },
++          { foreignKeyName: "trip_exceptions_farmer_id_fkey"; columns: ["farmer_id"]; isOneToOne: false; referencedRelation: "farmers"; referencedColumns: ["id"] },
++          { foreignKeyName: "trip_exceptions_mcc_id_fkey"; columns: ["mcc_id"]; isOneToOne: false; referencedRelation: "mcc_centres"; referencedColumns: ["id"] },
++          { foreignKeyName: "trip_exceptions_route_point_id_fkey"; columns: ["route_point_id"]; isOneToOne: false; referencedRelation: "route_points"; referencedColumns: ["id"] },
++          { foreignKeyName: "trip_exceptions_trip_id_fkey"; columns: ["trip_id"]; isOneToOne: false; referencedRelation: "route_trips"; referencedColumns: ["id"] },
+         ]
+       }
+       user_roles: {
+@@ -1834,13 +1536,7 @@ export type Database = {
+           user_id?: string
+         }
+         Relationships: [
+-          {
+-            foreignKeyName: "user_roles_mcc_id_fkey"
+-            columns: ["mcc_id"]
+-            isOneToOne: false
+-            referencedRelation: "mcc_centres"
+-            referencedColumns: ["id"]
+-          },
++          { foreignKeyName: "user_roles_mcc_id_fkey"; columns: ["mcc_id"]; isOneToOne: false; referencedRelation: "mcc_centres"; referencedColumns: ["id"] },
+         ]
+       }
+     }
+@@ -1848,11 +1544,60 @@ export type Database = {
+       [_ in never]: never
+     }
+     Functions: {
+-      has_role: {
+-        Args: {
+-          _role: Database["public"]["Enums"]["app_role"]
+-          _user_id: string
++      acknowledge_handover_variance: {
++        Args: { p_handover_id: string; p_reason: string }
++        Returns: {
++          agent_id: string
++          created_at: string
++          created_by: string | null
++          declared_collection_count: number
++          declared_quantity_litres: number
++          id: string
++          mcc_id: string
++          receipt_notes: string | null
++          received_at: string | null
++          received_by: string | null
++          received_quantity_litres: number | null
++          session: string
++          status: string
++          trip_date: string
++          trip_id: string
++          updated_at: string
++          variance_acknowledged_at: string | null
++          variance_acknowledged_by: string | null
++          variance_litres: number | null
++          variance_reason: string | null
+         }
++        SetofOptions: { from: "*"; to: "mcc_handovers"; isOneToOne: true; isSetofReturn: false }
++      }
++      create_mcc_handover: {
++        Args: { p_trip_id: string }
++        Returns: {
++          agent_id: string
++          created_at: string
++          created_by: string | null
++          declared_collection_count: number
++          declared_quantity_litres: number
++          id: string
++          mcc_id: string
++          receipt_notes: string | null
++          received_at: string | null
++          received_by: string | null
++          received_quantity_litres: number | null
++          session: string
++          status: string
++          trip_date: string
++          trip_id: string
++          updated_at: string
++          variance_acknowledged_at: string | null
++          variance_acknowledged_by: string | null
++          variance_litres: number | null
++          variance_reason: string | null
++        }
++        SetofOptions: { from: "*"; to: "mcc_handovers"; isOneToOne: true; isSetofReturn: false }
++      }
++      has_role: {
++        Args: { _role: Database["public"]["Enums"]["app_role"]; _user_id: string }
+         Returns: boolean
+       }
+       haversine_meters: {
+@@ -1860,6 +1605,32 @@ export type Database = {
+         Returns: number
+       }
+       is_staff: { Args: { _user_id: string }; Returns: boolean }
++      record_mcc_handover_receipt: {
++        Args: { p_handover_id: string; p_notes?: string; p_received_quantity_litres: number }
++        Returns: {
++          agent_id: string
++          created_at: string
++          created_by: string | null
++          declared_collection_count: number
++          declared_quantity_litres: number
++          id: string
++          mcc_id: string
++          receipt_notes: string | null
++          received_at: string | null
++          received_by: string | null
++          received_quantity_litres: number | null
++          session: string
++          status: string
++          trip_date: string
++          trip_id: string
++          updated_at: string
++          variance_acknowledged_at: string | null
++          variance_acknowledged_by: string | null
++          variance_litres: number | null
++          variance_reason: string | null
++        }
++        SetofOptions: { from: "*"; to: "mcc_handovers"; isOneToOne: true; isSetofReturn: false }
++      }
+       record_milk_collection: {
+         Args: {
+           p_acidity: number
+@@ -1874,7 +1645,7 @@ export type Database = {
+           p_gps_lat: number
+           p_gps_lng: number
+           p_mcc_id: string
+-          p_quality_override_reason?: string | null
++          p_quality_override_reason?: string
+           p_quantity_litres: number
+           p_rate_per_litre: number
+           p_risk_score: number
+@@ -1929,12 +1700,7 @@ export type Database = {
+           water_adulteration_flag: boolean
+           water_adulteration_pct: number | null
+         }
+-        SetofOptions: {
+-          from: "*"
+-          to: "milk_collections"
+-          isOneToOne: true
+-          isSetofReturn: false
+-        }
++        SetofOptions: { from: "*"; to: "milk_collections"; isOneToOne: true; isSetofReturn: false }
+       }
+       save_marked_route: {
+         Args: {
+@@ -1950,13 +1716,7 @@ export type Database = {
+       user_mcc_ids: { Args: { _user_id: string }; Returns: string[] }
+     }
+     Enums: {
+-      app_role:
+-        | "owner"
+-        | "manager"
+-        | "agent"
+-        | "buyer"
+-        | "farmer"
+-        | "accountant"
++      app_role: "owner" | "manager" | "agent" | "buyer" | "farmer" | "accountant"
+     }
+     CompositeTypes: {
+       [_ in never]: never
+diff --git a/src/lib/nav.ts b/src/lib/nav.ts
+index 5708347..5bd1102 100644
+--- a/src/lib/nav.ts
++++ b/src/lib/nav.ts
+@@ -1,33 +1,35 @@
+-/** Shared navigation sets so every staff screen exposes the same links. */
+-export const MANAGER_NAV = [
+-  { label: "Dashboard", to: "/manager" },
+-  { label: "Live map", to: "/live" },
+-  { label: "Collect milk", to: "/collect" },
+-  { label: "Transfers", to: "/transfers" },
+-  { label: "Quality", to: "/quality" },
+-  { label: "Finance", to: "/finance" },
+-  { label: "Reports", to: "/reports" },
+-  { label: "QR cards", to: "/cards" },
+-  { label: "Field setup", to: "/field-setup" },
+-];
+-
+-export const OWNER_NAV = [
+-  { label: "Overview", to: "/owner" },
+-  { label: "Live map", to: "/live" },
+-  { label: "Collect milk", to: "/collect" },
+-  { label: "Transfers", to: "/transfers" },
+-  { label: "Quality", to: "/quality" },
+-  { label: "Finance", to: "/finance" },
+-  { label: "Reports", to: "/reports" },
+-  { label: "QR cards", to: "/cards" },
+-  { label: "Field setup", to: "/field-setup" },
+-];
+-
+-/** Finance-facing screens (accountant home plus staff shortcuts). */
+-export const FINANCE_NAV = [
+-  { label: "Finance", to: "/finance" },
+-  { label: "Reports", to: "/reports" },
+-  { label: "Quality", to: "/quality" },
+-  { label: "Collect milk", to: "/collect" },
+-  { label: "Transfers", to: "/transfers" },
+-];
++/** Shared navigation sets so every staff screen exposes the same links. */
++export const MANAGER_NAV = [
++  { label: "Dashboard", to: "/manager" },
++  { label: "Live map", to: "/live" },
++  { label: "Collect milk", to: "/collect" },
++  { label: "MCC handovers", to: "/handovers" },
++  { label: "Transfers", to: "/transfers" },
++  { label: "Quality", to: "/quality" },
++  { label: "Finance", to: "/finance" },
++  { label: "Reports", to: "/reports" },
++  { label: "QR cards", to: "/cards" },
++  { label: "Field setup", to: "/field-setup" },
++];
++
++export const OWNER_NAV = [
++  { label: "Overview", to: "/owner" },
++  { label: "Live map", to: "/live" },
++  { label: "Collect milk", to: "/collect" },
++  { label: "MCC handovers", to: "/handovers" },
++  { label: "Transfers", to: "/transfers" },
++  { label: "Quality", to: "/quality" },
++  { label: "Finance", to: "/finance" },
++  { label: "Reports", to: "/reports" },
++  { label: "QR cards", to: "/cards" },
++  { label: "Field setup", to: "/field-setup" },
++];
++
++/** Finance-facing screens (accountant home plus staff shortcuts). */
++export const FINANCE_NAV = [
++  { label: "Finance", to: "/finance" },
++  { label: "Reports", to: "/reports" },
++  { label: "Quality", to: "/quality" },
++  { label: "Collect milk", to: "/collect" },
++  { label: "Transfers", to: "/transfers" },
++];
+diff --git a/src/routeTree.gen.ts b/src/routeTree.gen.ts
+index fe83916..a51cb0d 100644
+--- a/src/routeTree.gen.ts
++++ b/src/routeTree.gen.ts
+@@ -21,11 +21,14 @@ import { Route as AuthenticatedCollectionsRouteImport } from './routes/_authenti
+ import { Route as AuthenticatedFarmerRouteImport } from './routes/_authenticated/farmer'
+ import { Route as AuthenticatedFieldSetupRouteImport } from './routes/_authenticated/field-setup'
+ import { Route as AuthenticatedFinanceRouteImport } from './routes/_authenticated/finance'
++import { Route as AuthenticatedHandoverRouteImport } from './routes/_authenticated/handover'
++import { Route as AuthenticatedHandoversRouteImport } from './routes/_authenticated/handovers'
+ import { Route as AuthenticatedLiveRouteImport } from './routes/_authenticated/live'
+ import { Route as AuthenticatedManagerRouteImport } from './routes/_authenticated/manager'
+ import { Route as AuthenticatedOwnerRouteImport } from './routes/_authenticated/owner'
+ import { Route as AuthenticatedQualityRouteImport } from './routes/_authenticated/quality'
+ import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
++import { Route as AuthenticatedRouteMarkingRouteImport } from './routes/_authenticated/route-marking'
+ import { Route as AuthenticatedTransfersRouteImport } from './routes/_authenticated/transfers'
+ import { Route as AuthenticatedTripRouteImport } from './routes/_authenticated/trip'
+ import { Route as AuthenticatedCardCodeRouteImport } from './routes/_authenticated/card.$code'
+@@ -90,6 +93,16 @@ const AuthenticatedFinanceRoute = AuthenticatedFinanceRouteImport.update({
+   path: '/finance',
+   getParentRoute: () => AuthenticatedRouteRoute,
+ } as any)
++const AuthenticatedHandoverRoute = AuthenticatedHandoverRouteImport.update({
++  id: '/handover',
++  path: '/handover',
++  getParentRoute: () => AuthenticatedRouteRoute,
++} as any)
++const AuthenticatedHandoversRoute = AuthenticatedHandoversRouteImport.update({
++  id: '/handovers',
++  path: '/handovers',
++  getParentRoute: () => AuthenticatedRouteRoute,
++} as any)
+ const AuthenticatedLiveRoute = AuthenticatedLiveRouteImport.update({
+   id: '/live',
+   path: '/live',
+@@ -115,6 +128,12 @@ const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
+   path: '/reports',
+   getParentRoute: () => AuthenticatedRouteRoute,
+ } as any)
++const AuthenticatedRouteMarkingRoute =
++  AuthenticatedRouteMarkingRouteImport.update({
++    id: '/route-marking',
++    path: '/route-marking',
++    getParentRoute: () => AuthenticatedRouteRoute,
++  } as any)
+ const AuthenticatedTransfersRoute = AuthenticatedTransfersRouteImport.update({
+   id: '/transfers',
+   path: '/transfers',
+@@ -143,11 +162,14 @@ export interface FileRoutesByFullPath {
+   '/farmer': typeof AuthenticatedFarmerRoute
+   '/field-setup': typeof AuthenticatedFieldSetupRoute
+   '/finance': typeof AuthenticatedFinanceRoute
++  '/handover': typeof AuthenticatedHandoverRoute
++  '/handovers': typeof AuthenticatedHandoversRoute
+   '/live': typeof AuthenticatedLiveRoute
+   '/manager': typeof AuthenticatedManagerRoute
+   '/owner': typeof AuthenticatedOwnerRoute
+   '/quality': typeof AuthenticatedQualityRoute
+   '/reports': typeof AuthenticatedReportsRoute
++  '/route-marking': typeof AuthenticatedRouteMarkingRoute
+   '/transfers': typeof AuthenticatedTransfersRoute
+   '/trip': typeof AuthenticatedTripRoute
+   '/card/$code': typeof AuthenticatedCardCodeRoute
+@@ -164,11 +186,14 @@ export interface FileRoutesByTo {
+   '/farmer': typeof AuthenticatedFarmerRoute
+   '/field-setup': typeof AuthenticatedFieldSetupRoute
+   '/finance': typeof AuthenticatedFinanceRoute
++  '/handover': typeof AuthenticatedHandoverRoute
++  '/handovers': typeof AuthenticatedHandoversRoute
+   '/live': typeof AuthenticatedLiveRoute
+   '/manager': typeof AuthenticatedManagerRoute
+   '/owner': typeof AuthenticatedOwnerRoute
+   '/quality': typeof AuthenticatedQualityRoute
+   '/reports': typeof AuthenticatedReportsRoute
++  '/route-marking': typeof AuthenticatedRouteMarkingRoute
+   '/transfers': typeof AuthenticatedTransfersRoute
+   '/trip': typeof AuthenticatedTripRoute
+   '/card/$code': typeof AuthenticatedCardCodeRoute
+@@ -187,11 +212,14 @@ export interface FileRoutesById {
+   '/_authenticated/farmer': typeof AuthenticatedFarmerRoute
+   '/_authenticated/field-setup': typeof AuthenticatedFieldSetupRoute
+   '/_authenticated/finance': typeof AuthenticatedFinanceRoute
++  '/_authenticated/handover': typeof AuthenticatedHandoverRoute
++  '/_authenticated/handovers': typeof AuthenticatedHandoversRoute
+   '/_authenticated/live': typeof AuthenticatedLiveRoute
+   '/_authenticated/manager': typeof AuthenticatedManagerRoute
+   '/_authenticated/owner': typeof AuthenticatedOwnerRoute
+   '/_authenticated/quality': typeof AuthenticatedQualityRoute
+   '/_authenticated/reports': typeof AuthenticatedReportsRoute
++  '/_authenticated/route-marking': typeof AuthenticatedRouteMarkingRoute
+   '/_authenticated/transfers': typeof AuthenticatedTransfersRoute
+   '/_authenticated/trip': typeof AuthenticatedTripRoute
+   '/_authenticated/card/$code': typeof AuthenticatedCardCodeRoute
+@@ -210,11 +238,14 @@ export interface FileRouteTypes {
+     | '/farmer'
+     | '/field-setup'
+     | '/finance'
++    | '/handover'
++    | '/handovers'
+     | '/live'
+     | '/manager'
+     | '/owner'
+     | '/quality'
+     | '/reports'
++    | '/route-marking'
+     | '/transfers'
+     | '/trip'
+     | '/card/$code'
+@@ -231,11 +262,14 @@ export interface FileRouteTypes {
+     | '/farmer'
+     | '/field-setup'
+     | '/finance'
++    | '/handover'
++    | '/handovers'
+     | '/live'
+     | '/manager'
+     | '/owner'
+     | '/quality'
+     | '/reports'
++    | '/route-marking'
+     | '/transfers'
+     | '/trip'
+     | '/card/$code'
+@@ -253,11 +287,14 @@ export interface FileRouteTypes {
+     | '/_authenticated/farmer'
+     | '/_authenticated/field-setup'
+     | '/_authenticated/finance'
++    | '/_authenticated/handover'
++    | '/_authenticated/handovers'
+     | '/_authenticated/live'
+     | '/_authenticated/manager'
+     | '/_authenticated/owner'
+     | '/_authenticated/quality'
+     | '/_authenticated/reports'
++    | '/_authenticated/route-marking'
+     | '/_authenticated/transfers'
+     | '/_authenticated/trip'
+     | '/_authenticated/card/$code'
+@@ -355,6 +392,20 @@ declare module '@tanstack/react-router' {
+       preLoaderRoute: typeof AuthenticatedFinanceRouteImport
+       parentRoute: typeof AuthenticatedRouteRoute
+     }
++    '/_authenticated/handover': {
++      id: '/_authenticated/handover'
++      path: '/handover'
++      fullPath: '/handover'
++      preLoaderRoute: typeof AuthenticatedHandoverRouteImport
++      parentRoute: typeof AuthenticatedRouteRoute
++    }
++    '/_authenticated/handovers': {
++      id: '/_authenticated/handovers'
++      path: '/handovers'
++      fullPath: '/handovers'
++      preLoaderRoute: typeof AuthenticatedHandoversRouteImport
++      parentRoute: typeof AuthenticatedRouteRoute
++    }
+     '/_authenticated/live': {
+       id: '/_authenticated/live'
+       path: '/live'
+@@ -390,6 +441,13 @@ declare module '@tanstack/react-router' {
+       preLoaderRoute: typeof AuthenticatedReportsRouteImport
+       parentRoute: typeof AuthenticatedRouteRoute
+     }
++    '/_authenticated/route-marking': {
++      id: '/_authenticated/route-marking'
++      path: '/route-marking'
++      fullPath: '/route-marking'
++      preLoaderRoute: typeof AuthenticatedRouteMarkingRouteImport
++      parentRoute: typeof AuthenticatedRouteRoute
++    }
+     '/_authenticated/transfers': {
+       id: '/_authenticated/transfers'
+       path: '/transfers'
+@@ -424,11 +482,14 @@ interface AuthenticatedRouteRouteChildren {
+   AuthenticatedFarmerRoute: typeof AuthenticatedFarmerRoute
+   AuthenticatedFieldSetupRoute: typeof AuthenticatedFieldSetupRoute
+   AuthenticatedFinanceRoute: typeof AuthenticatedFinanceRoute
++  AuthenticatedHandoverRoute: typeof AuthenticatedHandoverRoute
++  AuthenticatedHandoversRoute: typeof AuthenticatedHandoversRoute
+   AuthenticatedLiveRoute: typeof AuthenticatedLiveRoute
+   AuthenticatedManagerRoute: typeof AuthenticatedManagerRoute
+   AuthenticatedOwnerRoute: typeof AuthenticatedOwnerRoute
+   AuthenticatedQualityRoute: typeof AuthenticatedQualityRoute
+   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
++  AuthenticatedRouteMarkingRoute: typeof AuthenticatedRouteMarkingRoute
+   AuthenticatedTransfersRoute: typeof AuthenticatedTransfersRoute
+   AuthenticatedTripRoute: typeof AuthenticatedTripRoute
+   AuthenticatedCardCodeRoute: typeof AuthenticatedCardCodeRoute
+@@ -444,11 +505,14 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+   AuthenticatedFarmerRoute: AuthenticatedFarmerRoute,
+   AuthenticatedFieldSetupRoute: AuthenticatedFieldSetupRoute,
+   AuthenticatedFinanceRoute: AuthenticatedFinanceRoute,
++  AuthenticatedHandoverRoute: AuthenticatedHandoverRoute,
++  AuthenticatedHandoversRoute: AuthenticatedHandoversRoute,
+   AuthenticatedLiveRoute: AuthenticatedLiveRoute,
+   AuthenticatedManagerRoute: AuthenticatedManagerRoute,
+   AuthenticatedOwnerRoute: AuthenticatedOwnerRoute,
+   AuthenticatedQualityRoute: AuthenticatedQualityRoute,
+   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
++  AuthenticatedRouteMarkingRoute: AuthenticatedRouteMarkingRoute,
+   AuthenticatedTransfersRoute: AuthenticatedTransfersRoute,
+   AuthenticatedTripRoute: AuthenticatedTripRoute,
+   AuthenticatedCardCodeRoute: AuthenticatedCardCodeRoute,
+diff --git a/src/routes/_authenticated/handover.tsx b/src/routes/_authenticated/handover.tsx
+new file mode 100644
+index 0000000..23dd8c5
+--- /dev/null
++++ b/src/routes/_authenticated/handover.tsx
+@@ -0,0 +1,175 @@
++import type { ReactNode } from "react";
++import { createFileRoute, Link, useSearch } from "@tanstack/react-router";
++import { useQuery, useQueryClient } from "@tanstack/react-query";
++import { CheckCircle2, Clock, AlertTriangle, ArrowLeft, Milk } from "lucide-react";
++import { z } from "zod";
++import { supabase } from "@/integrations/supabase/client";
++import { AppShell, PageHeading, StatCard } from "@/components/app-shell";
++import { Button } from "@/components/ui/button";
++import { Badge } from "@/components/ui/badge";
++
++const searchSchema = z.object({
++  trip: z.string().uuid(),
++});
++
++export const Route = createFileRoute("/_authenticated/handover")({
++  validateSearch: searchSchema,
++  head: () => ({
++    meta: [
++      { title: "MCC handover — DairyOne" },
++      {
++        name: "description",
++        content:
++          "Track your declared milk handover at the centre and any variance with what's received.",
++      },
++    ],
++  }),
++  component: HandoverStatusScreen,
++});
++
++/**
++ * PHASE 3 — Agent-facing handover status. The Agent's operational workflow
++ * ends here: they declared a quantity when they closed the trip, and this
++ * screen shows what the MCC operator recorded against it, without letting
++ * the Agent edit anything after the fact (all writes go through the
++ * SECURITY DEFINER RPCs — see trip.tsx `proceedToMcc` and the manager-side
++ * `handovers.tsx`).
++ */
++function HandoverStatusScreen() {
++  const { trip: tripId } = useSearch({ from: "/_authenticated/handover" });
++  const queryClient = useQueryClient();
++
++  const { data: handover, isLoading } = useQuery({
++    queryKey: ["mcc-handover", tripId],
++    enabled: Boolean(tripId),
++    refetchInterval: 15_000, // poll — the MCC operator may receipt this any time after the agent leaves
++    queryFn: async () => {
++      const { data, error } = await supabase
++        .from("mcc_handovers")
++        .select(
++          "id, status, declared_quantity_litres, declared_collection_count, received_quantity_litres, variance_litres, variance_reason, receipt_notes, received_at",
++        )
++        .eq("trip_id", tripId)
++        .maybeSingle();
++      if (error) throw error;
++      return data;
++    },
++  });
++
++  if (isLoading) {
++    return (
++      <AppShell mobileFirst>
++        <PageHeading title="Loading handover..." subtitle="Please wait." />
++      </AppShell>
++    );
++  }
++
++  if (!handover) {
++    return (
++      <AppShell mobileFirst>
++        <PageHeading title="No handover found" subtitle="This trip hasn't been handed over yet." />
++        <Button asChild size="lg" className="h-14 w-full text-base">
++          <Link to="/agent">
++            <ArrowLeft className="h-5 w-5" />
++            Back to home
++          </Link>
++        </Button>
++      </AppShell>
++    );
++  }
++
++  type StatusMeta = { label: string; tone: "secondary" | "outline"; icon: ReactNode };
++  const defaultMeta: StatusMeta = {
++    label: "Waiting for MCC to receive",
++    tone: "secondary",
++    icon: <Clock className="h-4 w-4" />,
++  };
++  const statusMeta: Record<string, StatusMeta> = {
++    declared: defaultMeta,
++    received: {
++      label: "Received — matches your declaration",
++      tone: "secondary",
++      icon: <CheckCircle2 className="h-4 w-4" />,
++    },
++    variance_flagged: {
++      label: "Variance flagged — pending manager review",
++      tone: "outline",
++      icon: <AlertTriangle className="h-4 w-4" />,
++    },
++    acknowledged: {
++      label: "Variance acknowledged and closed",
++      tone: "secondary",
++      icon: <CheckCircle2 className="h-4 w-4" />,
++    },
++  };
++
++  const meta: StatusMeta = statusMeta[handover.status] ?? defaultMeta;
++
++  return (
++    <AppShell mobileFirst>
++      <PageHeading
++        title="MCC handover"
++        subtitle="Your route is closed. Here's what happened at the centre."
++      />
++
++      <div className="surface-card flex flex-col items-center gap-2 p-6 text-center">
++        <Milk className="h-8 w-8 text-primary" />
++        <Badge variant={meta.tone} className="mt-1">
++          {meta.icon}
++          {meta.label}
++        </Badge>
++      </div>
++
++      <div className="mt-4 grid grid-cols-2 gap-3">
++        <StatCard
++          label="You declared"
++          value={`${handover.declared_quantity_litres.toFixed(1)} L`}
++        />
++        <StatCard
++          label="MCC received"
++          value={
++            handover.received_quantity_litres != null
++              ? `${handover.received_quantity_litres.toFixed(1)} L`
++              : "—"
++          }
++        />
++      </div>
++
++      {handover.status === "variance_flagged" && (
++        <div className="surface-card mt-4 border-accent/40 bg-accent/5 p-4 text-sm">
++          <p className="font-medium text-accent">
++            {Math.abs(Number(handover.variance_litres ?? 0)).toFixed(1)} L difference from what you
++            declared.
++          </p>
++          <p className="mt-1 text-muted-foreground">
++            Your manager has been notified and will review this. No action needed from you right
++            now.
++          </p>
++        </div>
++      )}
++
++      {handover.status === "acknowledged" && handover.variance_reason && (
++        <div className="surface-card mt-4 p-4 text-sm text-muted-foreground">
++          <p className="font-medium text-foreground">Resolution</p>
++          <p className="mt-1">{handover.variance_reason}</p>
++        </div>
++      )}
++
++      <div className="mt-6 grid gap-3">
++        <Button
++          variant="outline"
++          className="h-12"
++          onClick={() => void queryClient.invalidateQueries({ queryKey: ["mcc-handover", tripId] })}
++        >
++          Refresh status
++        </Button>
++        <Button asChild size="lg" className="h-14 text-base">
++          <Link to="/agent">
++            <ArrowLeft className="h-5 w-5" />
++            Back to home
++          </Link>
++        </Button>
++      </div>
++    </AppShell>
++  );
++}
+diff --git a/src/routes/_authenticated/handovers.tsx b/src/routes/_authenticated/handovers.tsx
+new file mode 100644
+index 0000000..b9c8f9d
+--- /dev/null
++++ b/src/routes/_authenticated/handovers.tsx
+@@ -0,0 +1,328 @@
++import { useState, type ReactNode } from "react";
++import { createFileRoute } from "@tanstack/react-router";
++import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
++import { CheckCircle2, Clock, AlertTriangle, Milk } from "lucide-react";
++import { toast } from "sonner";
++import { supabase } from "@/integrations/supabase/client";
++import { AppShell, PageHeading, StatCard } from "@/components/app-shell";
++import { Button } from "@/components/ui/button";
++import { Badge } from "@/components/ui/badge";
++import { Input } from "@/components/ui/input";
++import { Textarea } from "@/components/ui/textarea";
++import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
++import { useCurrentUser } from "@/hooks/useCurrentUser";
++import { useStaffMcc } from "@/hooks/useStaffMcc";
++import { MANAGER_NAV, OWNER_NAV } from "@/lib/nav";
++
++export const Route = createFileRoute("/_authenticated/handovers")({
++  head: () => ({
++    meta: [
++      { title: "MCC handovers — DairyOne" },
++      {
++        name: "description",
++        content:
++          "Receive agent milk handovers at the centre, reconcile against what was declared, and clear variance.",
++      },
++    ],
++  }),
++  component: HandoversScreen,
++});
++
++type HandoverRow = {
++  id: string;
++  trip_id: string;
++  trip_date: string;
++  session: string;
++  status: string;
++  declared_quantity_litres: number;
++  declared_collection_count: number;
++  received_quantity_litres: number | null;
++  variance_litres: number | null;
++  variance_reason: string | null;
++  agents: { full_name: string; employee_code: string } | null;
++};
++
++/**
++ * PHASE 3 — MCC handover receipt + reconciliation queue.
++ *
++ * All writes go through record_mcc_handover_receipt / acknowledge_handover_variance
++ * (SECURITY DEFINER RPCs) — never a direct update to mcc_handovers, which is
++ * locked down by an RLS policy that rejects client writes outright. This
++ * keeps the received quantity, the variance math, and the tolerance check
++ * fully server-side so a manager can independently confirm what actually
++ * arrived, exactly as PHASE 3 §"MCC HANDOVER" requires.
++ */
++function HandoversScreen() {
++  const { data: user } = useCurrentUser();
++  const { data: mcc } = useStaffMcc();
++  const queryClient = useQueryClient();
++  const nav = user?.role === "owner" ? OWNER_NAV : MANAGER_NAV;
++
++  const [receiptTarget, setReceiptTarget] = useState<HandoverRow | null>(null);
++  const [receivedQty, setReceivedQty] = useState("");
++  const [receiptNotes, setReceiptNotes] = useState("");
++
++  const [ackTarget, setAckTarget] = useState<HandoverRow | null>(null);
++  const [ackReason, setAckReason] = useState("");
++
++  const { data: rows = [], isLoading } = useQuery({
++    queryKey: ["mcc-handovers", mcc?.mccId],
++    enabled: Boolean(mcc?.mccId),
++    queryFn: async () => {
++      const { data, error } = await supabase
++        .from("mcc_handovers")
++        .select(
++          "id, trip_id, trip_date, session, status, declared_quantity_litres, declared_collection_count, received_quantity_litres, variance_litres, variance_reason, agents(full_name, employee_code)",
++        )
++        .eq("mcc_id", mcc!.mccId)
++        .order("created_at", { ascending: false })
++        .limit(50);
++      if (error) throw error;
++      return (data ?? []) as unknown as HandoverRow[];
++    },
++  });
++
++  const pending = rows.filter((r) => r.status === "declared");
++  const flagged = rows.filter((r) => r.status === "variance_flagged");
++  const settled = rows.filter((r) => r.status === "received" || r.status === "acknowledged");
++
++  const recordReceipt = useMutation({
++    mutationFn: async () => {
++      if (!receiptTarget) return;
++      const qty = Number(receivedQty);
++      if (!Number.isFinite(qty) || qty < 0) throw new Error("Enter a valid received quantity.");
++      const { error } = await supabase.rpc("record_mcc_handover_receipt", {
++        p_handover_id: receiptTarget.id,
++        p_received_quantity_litres: qty,
++        ...(receiptNotes ? { p_notes: receiptNotes } : {}),
++      });
++      if (error) throw error;
++    },
++    onSuccess: () => {
++      toast.success("Receipt recorded");
++      setReceiptTarget(null);
++      setReceivedQty("");
++      setReceiptNotes("");
++      void queryClient.invalidateQueries({ queryKey: ["mcc-handovers"] });
++    },
++    onError: (error: Error) => toast.error(error.message),
++  });
++
++  const acknowledgeVariance = useMutation({
++    mutationFn: async () => {
++      if (!ackTarget) return;
++      if (!ackReason.trim()) throw new Error("A reason is required to acknowledge this variance.");
++      const { error } = await supabase.rpc("acknowledge_handover_variance", {
++        p_handover_id: ackTarget.id,
++        p_reason: ackReason.trim(),
++      });
++      if (error) throw error;
++    },
++    onSuccess: () => {
++      toast.success("Variance acknowledged");
++      setAckTarget(null);
++      setAckReason("");
++      void queryClient.invalidateQueries({ queryKey: ["mcc-handovers"] });
++    },
++    onError: (error: Error) => toast.error(error.message),
++  });
++
++  function HandoverCard({ row, action }: { row: HandoverRow; action?: ReactNode }) {
++    return (
++      <div className="surface-card flex items-center justify-between gap-3 p-4">
++        <div>
++          <p className="text-sm font-medium">{row.agents?.full_name ?? "Agent"}</p>
++          <p className="text-xs text-muted-foreground">
++            {row.agents?.employee_code} · {row.trip_date} · {row.session}
++          </p>
++          <p className="mt-1 text-sm">
++            Declared{" "}
++            <span className="font-semibold">{row.declared_quantity_litres.toFixed(1)} L</span>
++            {row.received_quantity_litres != null && (
++              <>
++                {" "}
++                · Received{" "}
++                <span className="font-semibold">{row.received_quantity_litres.toFixed(1)} L</span>
++              </>
++            )}
++          </p>
++          {row.variance_litres != null && Math.abs(row.variance_litres) > 0 && (
++            <p className="text-xs text-accent">
++              {Math.abs(row.variance_litres).toFixed(1)} L variance
++              {row.variance_reason ? ` — ${row.variance_reason}` : ""}
++            </p>
++          )}
++        </div>
++        {action}
++      </div>
++    );
++  }
++
++  return (
++    <AppShell nav={nav}>
++      <PageHeading
++        title="MCC handovers"
++        subtitle="Confirm what agents actually brought in and reconcile against their declaration."
++      />
++
++      <div className="grid gap-4 sm:grid-cols-3">
++        <StatCard
++          label="Awaiting receipt"
++          value={pending.length}
++          icon={<Clock className="h-4 w-4" />}
++        />
++        <StatCard
++          label="Variance flagged"
++          value={flagged.length}
++          icon={<AlertTriangle className="h-4 w-4" />}
++        />
++        <StatCard
++          label="Settled"
++          value={settled.length}
++          icon={<CheckCircle2 className="h-4 w-4" />}
++        />
++      </div>
++
++      {isLoading && <p className="mt-6 text-sm text-muted-foreground">Loading handovers...</p>}
++
++      {flagged.length > 0 && (
++        <div className="mt-6">
++          <p className="mb-2 text-sm font-semibold text-accent">Needs acknowledgement</p>
++          <div className="space-y-2">
++            {flagged.map((row) => (
++              <HandoverCard
++                key={row.id}
++                row={row}
++                action={
++                  <Button size="sm" onClick={() => setAckTarget(row)}>
++                    Acknowledge
++                  </Button>
++                }
++              />
++            ))}
++          </div>
++        </div>
++      )}
++
++      <div className="mt-6">
++        <p className="mb-2 text-sm font-semibold text-muted-foreground">Awaiting receipt</p>
++        <div className="space-y-2">
++          {pending.map((row) => (
++            <HandoverCard
++              key={row.id}
++              row={row}
++              action={
++                <Button
++                  size="sm"
++                  onClick={() => {
++                    setReceiptTarget(row);
++                    setReceivedQty(row.declared_quantity_litres.toFixed(1));
++                  }}
++                >
++                  <Milk className="h-3.5 w-3.5" />
++                  Record receipt
++                </Button>
++              }
++            />
++          ))}
++          {pending.length === 0 && !isLoading && (
++            <p className="surface-card p-4 text-sm text-muted-foreground">
++              No handovers waiting on a receipt right now.
++            </p>
++          )}
++        </div>
++      </div>
++
++      {settled.length > 0 && (
++        <div className="mt-6">
++          <p className="mb-2 text-sm font-semibold text-muted-foreground">Settled</p>
++          <div className="space-y-2">
++            {settled.map((row) => (
++              <HandoverCard
++                key={row.id}
++                row={row}
++                action={
++                  <Badge variant="secondary">
++                    <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
++                    {row.status === "acknowledged" ? "Acknowledged" : "Matched"}
++                  </Badge>
++                }
++              />
++            ))}
++          </div>
++        </div>
++      )}
++
++      {/* RECORD RECEIPT */}
++      <Dialog
++        open={Boolean(receiptTarget)}
++        onOpenChange={(open) => !open && setReceiptTarget(null)}
++      >
++        <DialogContent className="sm:max-w-sm">
++          <DialogHeader>
++            <DialogTitle>Record receipt — {receiptTarget?.agents?.full_name}</DialogTitle>
++          </DialogHeader>
++          <div className="space-y-3">
++            <p className="text-sm text-muted-foreground">
++              Agent declared {receiptTarget?.declared_quantity_litres.toFixed(1)} L from{" "}
++              {receiptTarget?.declared_collection_count} collection
++              {receiptTarget?.declared_collection_count === 1 ? "" : "s"}. Weigh and enter what you
++              actually received.
++            </p>
++            <Input
++              type="number"
++              inputMode="decimal"
++              step="0.1"
++              className="h-12 text-base"
++              placeholder="Received litres"
++              value={receivedQty}
++              onChange={(e) => setReceivedQty(e.target.value)}
++            />
++            <Textarea
++              placeholder="Notes (optional)"
++              value={receiptNotes}
++              onChange={(e) => setReceiptNotes(e.target.value)}
++            />
++            <Button
++              size="lg"
++              className="h-12 w-full"
++              disabled={recordReceipt.isPending}
++              onClick={() => recordReceipt.mutate()}
++            >
++              Confirm receipt
++            </Button>
++          </div>
++        </DialogContent>
++      </Dialog>
++
++      {/* ACKNOWLEDGE VARIANCE */}
++      <Dialog open={Boolean(ackTarget)} onOpenChange={(open) => !open && setAckTarget(null)}>
++        <DialogContent className="sm:max-w-sm">
++          <DialogHeader>
++            <DialogTitle>Acknowledge variance — {ackTarget?.agents?.full_name}</DialogTitle>
++          </DialogHeader>
++          <div className="space-y-3">
++            <p className="text-sm text-muted-foreground">
++              {ackTarget?.variance_litres != null &&
++                `${Math.abs(ackTarget.variance_litres).toFixed(1)} L difference between declared and received.`}{" "}
++              A reason is required to close this out.
++            </p>
++            <Textarea
++              placeholder="Reason for variance"
++              value={ackReason}
++              onChange={(e) => setAckReason(e.target.value)}
++            />
++            <Button
++              size="lg"
++              className="h-12 w-full"
++              disabled={acknowledgeVariance.isPending}
++              onClick={() => acknowledgeVariance.mutate()}
++            >
++              Acknowledge
++            </Button>
++          </div>
++        </DialogContent>
++      </Dialog>
++    </AppShell>
++  );
++}
+diff --git a/src/routes/_authenticated/manager.tsx b/src/routes/_authenticated/manager.tsx
+index 0be91c2..76f583d 100644
+--- a/src/routes/_authenticated/manager.tsx
++++ b/src/routes/_authenticated/manager.tsx
+@@ -1,75 +1,172 @@
+-import { createFileRoute } from "@tanstack/react-router";
+-import { useQuery } from "@tanstack/react-query";
+-import { Users, Route as RouteIcon, ClipboardCheck } from "lucide-react";
+-import { supabase } from "@/integrations/supabase/client";
+-import { AppShell, PageHeading, PhaseCard, StatCard } from "@/components/app-shell";
+-import { useCurrentUser } from "@/hooks/useCurrentUser";
+-import { MANAGER_NAV } from "@/lib/nav";
+-
+-export const Route = createFileRoute("/_authenticated/manager")({
+-  component: ManagerDashboard,
+-});
+-
+-function ManagerDashboard() {
+-  const { data: user } = useCurrentUser();
+-  const { data: counts } = useQuery({
+-    queryKey: ["manager-counts"],
+-    queryFn: async () => {
+-      const [agents, farmers, routes] = await Promise.all([
+-        supabase.from("agents").select("id", { count: "exact", head: true }),
+-        supabase.from("farmers").select("id", { count: "exact", head: true }),
+-        supabase.from("routes").select("id", { count: "exact", head: true }),
+-      ]);
+-      return {
+-        agents: agents.count ?? 0,
+-        farmers: farmers.count ?? 0,
+-        routes: routes.count ?? 0,
+-      };
+-    },
+-  });
+-
+-  return (
+-    <AppShell nav={MANAGER_NAV}>
+-      <PageHeading
+-        title="Centre dashboard"
+-        subtitle={
+-          user?.mccIds.length
+-            ? "Your assigned collection centre operations."
+-            : "No collection centre assigned to you yet — an Owner can assign one."
+-        }
+-      />
+-      <div className="grid gap-4 sm:grid-cols-3">
+-        <StatCard label="Agents at my centre" value={counts?.agents ?? 0} icon={<Users className="h-4 w-4" />} />
+-        <StatCard label="Farmers" value={counts?.farmers ?? 0} icon={<Users className="h-4 w-4" />} />
+-        <StatCard label="Routes" value={counts?.routes ?? 0} icon={<RouteIcon className="h-4 w-4" />} />
+-      </div>
+-
+-      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+-        <PhaseCard
+-          phase="Phase 3"
+-          title="Collect Milk queue"
+-          items={[
+-            "From Agent — field entries flowing in from routes",
+-            "From Farmers at Centre — walk-in entries you weigh yourself",
+-            "Same milk-entry form as the agent, with QR scan-to-lookup",
+-          ]}
+-        />
+-        <PhaseCard
+-          phase="Phase 3"
+-          title="Verify & transfer"
+-          items={[
+-            "Verify/Confirm agent submissions before they count to MCC totals",
+-            "Live agent trip status, route-point progress and punch times",
+-            "Batch collected milk into a transfer for the dairy plant",
+-          ]}
+-        />
+-      </div>
+-      <div className="surface-card mt-4 flex items-center gap-3 p-5">
+-        <ClipboardCheck className="h-5 w-5 text-accent" />
+-        <p className="text-sm text-muted-foreground">
+-          Centre walk-in entries post directly; only agent field entries need your approval.
+-        </p>
+-      </div>
+-    </AppShell>
+-  );
+-}
++import { createFileRoute, Link } from "@tanstack/react-router";
++import { useQuery } from "@tanstack/react-query";
++import { Users, Route as RouteIcon, ClipboardCheck, AlertTriangle, Truck } from "lucide-react";
++import { supabase } from "@/integrations/supabase/client";
++import { AppShell, PageHeading, PhaseCard, StatCard } from "@/components/app-shell";
++import { Badge } from "@/components/ui/badge";
++import { useCurrentUser } from "@/hooks/useCurrentUser";
++import { useStaffMcc } from "@/hooks/useStaffMcc";
++import { MANAGER_NAV } from "@/lib/nav";
++
++const EXCEPTION_LABELS: Record<string, string> = {
++  farmer_unavailable: "Farmer unavailable",
++  farmer_skipped: "Farmer skipped",
++  route_issue: "Route issue",
++  other: "Other",
++  quality_issue: "Quality issue",
++  quantity_mismatch: "MCC handover variance",
++};
++
++export const Route = createFileRoute("/_authenticated/manager")({
++  component: ManagerDashboard,
++});
++
++function ManagerDashboard() {
++  const { data: user } = useCurrentUser();
++  const { data: mcc } = useStaffMcc();
++  const { data: counts } = useQuery({
++    queryKey: ["manager-counts"],
++    queryFn: async () => {
++      const [agents, farmers, routes] = await Promise.all([
++        supabase.from("agents").select("id", { count: "exact", head: true }),
++        supabase.from("farmers").select("id", { count: "exact", head: true }),
++        supabase.from("routes").select("id", { count: "exact", head: true }),
++      ]);
++      return {
++        agents: agents.count ?? 0,
++        farmers: farmers.count ?? 0,
++        routes: routes.count ?? 0,
++      };
++    },
++  });
++
++  // PHASE 3 — open exceptions at this centre, most recent first. Quantity
++  // mismatches (MCC handover variance) live here too rather than being
++  // buried in a note, per the "structured exceptions" requirement.
++  const { data: exceptions = [] } = useQuery({
++    queryKey: ["manager-open-exceptions", mcc?.mccId],
++    enabled: Boolean(mcc?.mccId),
++    queryFn: async () => {
++      const { data, error } = await supabase
++        .from("trip_exceptions")
++        .select("id, type, reason, created_at, agents(full_name)")
++        .eq("mcc_id", mcc!.mccId)
++        .eq("status", "open")
++        .order("created_at", { ascending: false })
++        .limit(10);
++      if (error) throw error;
++      return data ?? [];
++    },
++  });
++
++  const { data: pendingHandovers = 0 } = useQuery({
++    queryKey: ["manager-pending-handovers", mcc?.mccId],
++    enabled: Boolean(mcc?.mccId),
++    queryFn: async () => {
++      const { count } = await supabase
++        .from("mcc_handovers")
++        .select("id", { count: "exact", head: true })
++        .eq("mcc_id", mcc!.mccId)
++        .in("status", ["declared", "variance_flagged"]);
++      return count ?? 0;
++    },
++  });
++
++  return (
++    <AppShell nav={MANAGER_NAV}>
++      <PageHeading
++        title="Centre dashboard"
++        subtitle={
++          user?.mccIds.length
++            ? "Your assigned collection centre operations."
++            : "No collection centre assigned to you yet — an Owner can assign one."
++        }
++      />
++      <div className="grid gap-4 sm:grid-cols-3">
++        <StatCard
++          label="Agents at my centre"
++          value={counts?.agents ?? 0}
++          icon={<Users className="h-4 w-4" />}
++        />
++        <StatCard
++          label="Farmers"
++          value={counts?.farmers ?? 0}
++          icon={<Users className="h-4 w-4" />}
++        />
++        <StatCard
++          label="Routes"
++          value={counts?.routes ?? 0}
++          icon={<RouteIcon className="h-4 w-4" />}
++        />
++      </div>
++
++      {pendingHandovers > 0 && (
++        <Link
++          to="/handovers"
++          className="surface-card mt-4 flex items-center gap-3 border-accent/40 bg-accent/5 p-4"
++        >
++          <Truck className="h-5 w-5 text-accent" />
++          <p className="flex-1 text-sm text-muted-foreground">
++            {pendingHandovers} MCC handover{pendingHandovers === 1 ? "" : "s"} waiting on you today.
++          </p>
++          <Badge variant="outline">Review</Badge>
++        </Link>
++      )}
++
++      {exceptions.length > 0 && (
++        <div className="surface-card mt-4 p-4">
++          <p className="mb-2 flex items-center gap-2 text-sm font-semibold text-accent">
++            <AlertTriangle className="h-4 w-4" />
++            Open exceptions
++          </p>
++          <ul className="divide-y divide-border">
++            {exceptions.map((e) => (
++              <li key={e.id} className="flex items-center justify-between gap-3 py-2 text-sm">
++                <div>
++                  <p className="font-medium">{EXCEPTION_LABELS[e.type] ?? e.type}</p>
++                  <p className="text-xs text-muted-foreground">
++                    {e.agents?.full_name ?? "Agent"}
++                    {e.reason ? ` — ${e.reason}` : ""}
++                  </p>
++                </div>
++                <span className="whitespace-nowrap text-xs text-muted-foreground">
++                  {new Date(e.created_at).toLocaleTimeString([], {
++                    hour: "2-digit",
++                    minute: "2-digit",
++                  })}
++                </span>
++              </li>
++            ))}
++          </ul>
++        </div>
++      )}
++
++      <div className="mt-6 grid gap-4 lg:grid-cols-2">
++        <PhaseCard
++          phase="Phase 3"
++          title="Collect Milk queue"
++          items={[
++            "From Agent — field entries flowing in from routes",
++            "From Farmers at Centre — walk-in entries you weigh yourself",
++            "Same milk-entry form as the agent, with QR scan-to-lookup",
++          ]}
++        />
++        <PhaseCard
++          phase="Phase 3"
++          title="Verify & transfer"
++          items={[
++            "Verify/Confirm agent submissions before they count to MCC totals",
++            "Live agent trip status, route-point progress and punch times",
++            "Batch collected milk into a transfer for the dairy plant",
++          ]}
++        />
++      </div>
++      <div className="surface-card mt-4 flex items-center gap-3 p-5">
++        <ClipboardCheck className="h-5 w-5 text-accent" />
++        <p className="text-sm text-muted-foreground">
++          Centre walk-in entries post directly; only agent field entries need your approval.
++        </p>
++      </div>
++    </AppShell>
++  );
++}
+diff --git a/src/routes/_authenticated/trip.tsx b/src/routes/_authenticated/trip.tsx
+index 8d88a46..ebe7559 100644
+--- a/src/routes/_authenticated/trip.tsx
++++ b/src/routes/_authenticated/trip.tsx
+@@ -113,6 +113,11 @@ function TripScreen() {
+   const [exceptionType, setExceptionType] = useState("farmer_unavailable");
+   const [exceptionReason, setExceptionReason] = useState("");
+ 
++  // PHASE 3 — Route Completion Summary shown before the Agent commits to
++  // closing the trip, so "Proceed to MCC" is a deliberate step with the
++  // day's numbers in front of them, not a silent status flip.
++  const [completionOpen, setCompletionOpen] = useState(false);
++
+   /*
+    * ACTIVE TRIP
+    */
+@@ -559,7 +564,7 @@ function TripScreen() {
+    * END TRIP
+    */
+ 
+-  const endTrip = useMutation({
++  const proceedToMcc = useMutation({
+     mutationFn: async () => {
+       if (!trip || !agent) return;
+ 
+@@ -587,17 +592,30 @@ function TripScreen() {
+         .eq("id", trip.id);
+ 
+       if (error) throw error;
++
++      // PHASE 3 — declare the handover now that the route is closed. This is
++      // idempotent server-side (create_mcc_handover returns the existing row
++      // on retry), so a flaky network here can never create two handovers
++      // for the same trip.
++      const { error: handoverError } = await supabase.rpc("create_mcc_handover", {
++        p_trip_id: trip.id,
++      });
++
++      if (handoverError) throw handoverError;
+     },
+ 
+     onSuccess: async () => {
+-      toast.success("Trip closed. Milk handed over at the centre.");
++      toast.success("Trip closed. Handover declared at the centre.");
+ 
+       await queryClient.invalidateQueries({
+         queryKey: ["active-trip"],
+       });
+ 
++      setCompletionOpen(false);
++
+       navigate({
+-        to: "/agent",
++        to: "/handover",
++        search: { trip: trip!.id },
+       });
+     },
+ 
+@@ -997,8 +1015,7 @@ function TripScreen() {
+         size="lg"
+         variant="outline"
+         className="mt-6 h-14 w-full text-base"
+-        onClick={() => endTrip.mutate()}
+-        disabled={endTrip.isPending}
++        onClick={() => setCompletionOpen(true)}
+       >
+         <Home className="h-5 w-5" />
+         Return to MCC & close trip
+@@ -1138,6 +1155,59 @@ function TripScreen() {
+           </div>
+         </DialogContent>
+       </Dialog>
++
++      {/* PHASE 3 — ROUTE COMPLETION SUMMARY, shown before the Agent commits
++          to closing the trip and declaring the MCC handover. */}
++      <Dialog open={completionOpen} onOpenChange={setCompletionOpen}>
++        <DialogContent className="sm:max-w-sm">
++          <DialogHeader>
++            <DialogTitle>Route completion summary</DialogTitle>
++          </DialogHeader>
++
++          <div className="space-y-3">
++            <div className="grid grid-cols-2 gap-3">
++              <div className="surface-card p-3 text-center">
++                <p className="text-2xl font-semibold">{allFarmers.length}</p>
++                <p className="text-xs text-muted-foreground">Farmers assigned</p>
++              </div>
++              <div className="surface-card p-3 text-center">
++                <p className="text-2xl font-semibold">{collectedFarmers.size}</p>
++                <p className="text-xs text-muted-foreground">Completed</p>
++              </div>
++              <div className="surface-card p-3 text-center">
++                <p className="text-2xl font-semibold">{exceptedFarmers.size}</p>
++                <p className="text-xs text-muted-foreground">Missed / unavailable</p>
++              </div>
++              <div className="surface-card p-3 text-center">
++                <p className="text-2xl font-semibold">{totalLitres.toFixed(1)} L</p>
++                <p className="text-xs text-muted-foreground">Total collected</p>
++              </div>
++            </div>
++
++            {openExceptionCount > 0 && (
++              <div className="surface-card flex items-center gap-2 border-accent/40 bg-accent/5 p-3 text-sm">
++                <AlertTriangle className="h-4 w-4 text-accent" />
++                {openExceptionCount} open exception{openExceptionCount === 1 ? "" : "s"} on this
++                route.
++              </div>
++            )}
++
++            <p className="text-xs text-muted-foreground">
++              Closing the trip declares this total at the centre. The MCC operator will
++              independently record what they receive.
++            </p>
++
++            <Button
++              size="lg"
++              className="h-12 w-full"
++              disabled={proceedToMcc.isPending}
++              onClick={() => proceedToMcc.mutate()}
++            >
++              Proceed to MCC
++            </Button>
++          </div>
++        </DialogContent>
++      </Dialog>
+     </AppShell>
+   );
+-}
+\ No newline at end of file
++}
+diff --git a/supabase/migrations/20260818072100_part1_trip_exceptions.sql b/supabase/migrations/20260818072100_part1_trip_exceptions.sql
+new file mode 100644
+index 0000000..258320d
+--- /dev/null
++++ b/supabase/migrations/20260818072100_part1_trip_exceptions.sql
+@@ -0,0 +1,61 @@
++-- PART 1 §5 / PHASE 3 — Structured trip exceptions
++--
++-- NOTE: reconstructed from the live schema on 2026-08-19 to close a drift
++-- gap (see phase3_mcc_handover_reconciliation.sql for context). Covers
++-- farmer_unavailable / farmer_skipped / route_issue / other (Part 1) plus
++-- quality_issue / quantity_mismatch (Phase 2/3).
++
++create table if not exists public.trip_exceptions (
++  id uuid primary key default gen_random_uuid(),
++  trip_id uuid not null references public.route_trips(id) on delete cascade,
++  agent_id uuid not null references public.agents(id) on delete cascade,
++  mcc_id uuid not null references public.mcc_centres(id) on delete cascade,
++  route_point_id uuid references public.route_points(id) on delete set null,
++  farmer_id uuid references public.farmers(id) on delete set null,
++  type text not null check (
++    type = any (array[
++      'farmer_unavailable', 'farmer_skipped', 'route_issue', 'other',
++      'quality_issue', 'quantity_mismatch'
++    ])
++  ),
++  reason text,
++  status text not null default 'open' check (status = any (array['open', 'resolved'])),
++  created_by uuid references auth.users(id),
++  created_at timestamptz not null default now(),
++  resolved_at timestamptz,
++  resolved_by uuid references auth.users(id)
++);
++
++create index if not exists trip_exceptions_trip_id_idx on public.trip_exceptions (trip_id);
++create index if not exists trip_exceptions_farmer_id_idx on public.trip_exceptions (farmer_id);
++
++grant select, insert, update, delete on public.trip_exceptions to authenticated;
++grant all on public.trip_exceptions to service_role;
++
++alter table public.trip_exceptions enable row level security;
++
++create policy "exceptions readable" on public.trip_exceptions for select to authenticated
++  using (
++    public.has_role(auth.uid(), 'owner')
++    or mcc_id in (select public.user_mcc_ids(auth.uid()))
++    or agent_id in (select a.id from public.agents a where a.profile_id = auth.uid())
++  );
++
++create policy "exceptions inserted by agent or manager" on public.trip_exceptions for insert to authenticated
++  with check (
++    public.has_role(auth.uid(), 'owner')
++    or (public.has_role(auth.uid(), 'manager') and mcc_id in (select public.user_mcc_ids(auth.uid())))
++    or agent_id in (select a.id from public.agents a where a.profile_id = auth.uid())
++  );
++
++create policy "exceptions updated by agent or manager" on public.trip_exceptions for update to authenticated
++  using (
++    public.has_role(auth.uid(), 'owner')
++    or (public.has_role(auth.uid(), 'manager') and mcc_id in (select public.user_mcc_ids(auth.uid())))
++    or agent_id in (select a.id from public.agents a where a.profile_id = auth.uid())
++  )
++  with check (
++    public.has_role(auth.uid(), 'owner')
++    or (public.has_role(auth.uid(), 'manager') and mcc_id in (select public.user_mcc_ids(auth.uid())))
++    or agent_id in (select a.id from public.agents a where a.profile_id = auth.uid())
++  );
+diff --git a/supabase/migrations/20260819075412_phase3_mcc_handover_reconciliation.sql b/supabase/migrations/20260819075412_phase3_mcc_handover_reconciliation.sql
+new file mode 100644
+index 0000000..2cb2bf8
+--- /dev/null
++++ b/supabase/migrations/20260819075412_phase3_mcc_handover_reconciliation.sql
+@@ -0,0 +1,58 @@
++-- PHASE 3 — MCC Handover + Reconciliation
++--
++-- NOTE: this file was reconstructed from the live schema on 2026-08-19 to
++-- close a drift gap — it had been applied directly to the Supabase project
++-- but never committed to this repo. See the Phase 3 completion report for
++-- details. Written to be safe to (re-)run.
++
++alter table public.mcc_centres
++  add column if not exists handover_variance_tolerance_litres numeric not null default 2;
++comment on column public.mcc_centres.handover_variance_tolerance_litres is
++  'Litres of Agent-declared vs MCC-received variance allowed before a handover is flagged and requires acknowledgement. Owner-configurable.';
++
++create table if not exists public.mcc_handovers (
++  id uuid primary key default gen_random_uuid(),
++  trip_id uuid not null unique references public.route_trips(id) on delete cascade,
++  agent_id uuid not null references public.agents(id) on delete cascade,
++  mcc_id uuid not null references public.mcc_centres(id) on delete cascade,
++  trip_date date not null,
++  session text not null default 'morning',
++  declared_quantity_litres numeric not null,
++  declared_collection_count integer not null default 0,
++  received_quantity_litres numeric,
++  variance_litres numeric generated always as (received_quantity_litres - declared_quantity_litres) stored,
++  status text not null default 'declared'
++    check (status = any (array['declared', 'received', 'variance_flagged', 'acknowledged'])),
++  received_by uuid references auth.users(id),
++  received_at timestamptz,
++  receipt_notes text,
++  variance_acknowledged_by uuid references auth.users(id),
++  variance_acknowledged_at timestamptz,
++  variance_reason text,
++  created_by uuid references auth.users(id),
++  created_at timestamptz not null default now(),
++  updated_at timestamptz not null default now()
++);
++
++create index if not exists mcc_handovers_mcc_status_idx on public.mcc_handovers (mcc_id, status);
++
++grant select, insert, update, delete on public.mcc_handovers to authenticated;
++grant all on public.mcc_handovers to service_role;
++
++alter table public.mcc_handovers enable row level security;
++
++-- All writes go through the SECURITY DEFINER RPCs below (create / receipt /
++-- acknowledge) so quantities and status transitions are always
++-- server-validated. Direct table writes from clients are blocked.
++create policy "mcc_handovers_no_direct_write" on public.mcc_handovers for all to authenticated
++  using (false) with check (false);
++
++create policy "mcc_handovers_select" on public.mcc_handovers for select to authenticated
++  using (
++    public.has_role(auth.uid(), 'owner')
++    or mcc_id in (select public.user_mcc_ids(auth.uid()))
++    or agent_id in (select id from public.agents where profile_id = auth.uid())
++  );
++
++create trigger t_mcc_handovers_touch before update on public.mcc_handovers
++  for each row execute function public.touch_updated_at();
+diff --git a/supabase/migrations/20260819075434_phase3_mcc_handover_rpcs.sql b/supabase/migrations/20260819075434_phase3_mcc_handover_rpcs.sql
+new file mode 100644
+index 0000000..31307c0
+--- /dev/null
++++ b/supabase/migrations/20260819075434_phase3_mcc_handover_rpcs.sql
+@@ -0,0 +1,184 @@
++-- PHASE 3 — MCC Handover RPCs
++--
++-- NOTE: reconstructed from the live schema on 2026-08-19 (see sibling
++-- migration file for context). All three functions are SECURITY DEFINER so
++-- quantities, authorization, and the variance-tolerance comparison happen
++-- on the server — a client can never fabricate a "received" quantity or
++-- silently skip the variance flag.
++
++create or replace function public.create_mcc_handover(p_trip_id uuid)
++returns public.mcc_handovers
++language plpgsql
++security definer
++set search_path to 'public'
++as $function$
++declare
++  v_uid uuid := auth.uid();
++  v_trip record;
++  v_agent record;
++  v_existing public.mcc_handovers;
++  v_row public.mcc_handovers;
++  v_qty numeric;
++  v_count integer;
++begin
++  -- Idempotent: a retry (flaky network after the first success) returns the
++  -- existing row instead of raising or creating a duplicate handover.
++  select * into v_existing from public.mcc_handovers where trip_id = p_trip_id;
++  if found then
++    return v_existing;
++  end if;
++
++  select * into v_trip from public.route_trips where id = p_trip_id;
++  if not found then
++    raise exception 'Trip not found.';
++  end if;
++
++  select a.* into v_agent from public.agents a where a.id = v_trip.agent_id;
++
++  if not (
++    public.has_role(v_uid, 'owner')
++    or (v_agent.profile_id = v_uid)
++    or (v_trip.mcc_id in (select public.user_mcc_ids(v_uid)))
++  ) then
++    raise exception 'Not authorized to hand over this trip.';
++  end if;
++
++  if v_trip.status <> 'completed' then
++    raise exception 'Complete the route before handing over at the MCC.';
++  end if;
++
++  select coalesce(sum(quantity_litres), 0), count(*)
++    into v_qty, v_count
++    from public.milk_collections
++    where trip_id = p_trip_id;
++
++  insert into public.mcc_handovers (
++    trip_id, agent_id, mcc_id, trip_date, session,
++    declared_quantity_litres, declared_collection_count, created_by
++  ) values (
++    p_trip_id, v_trip.agent_id, v_trip.mcc_id, v_trip.trip_date, v_trip.session,
++    v_qty, v_count, v_uid
++  )
++  returning * into v_row;
++
++  return v_row;
++end;
++$function$;
++
++create or replace function public.record_mcc_handover_receipt(
++  p_handover_id uuid,
++  p_received_quantity_litres numeric,
++  p_notes text default null
++)
++returns public.mcc_handovers
++language plpgsql
++security definer
++set search_path to 'public'
++as $function$
++declare
++  v_uid uuid := auth.uid();
++  v_row public.mcc_handovers;
++  v_tolerance numeric;
++  v_variance numeric;
++begin
++  if p_received_quantity_litres is null or p_received_quantity_litres < 0 then
++    raise exception 'Received quantity must be zero or greater.';
++  end if;
++
++  select * into v_row from public.mcc_handovers where id = p_handover_id;
++  if not found then
++    raise exception 'Handover not found.';
++  end if;
++
++  if not (
++    public.has_role(v_uid, 'owner')
++    or (v_row.mcc_id in (select public.user_mcc_ids(v_uid)))
++  ) then
++    raise exception 'Only a manager or owner at this centre can record the receipt.';
++  end if;
++
++  if v_row.status not in ('declared') then
++    raise exception 'This handover has already been receipted.';
++  end if;
++
++  select handover_variance_tolerance_litres into v_tolerance
++    from public.mcc_centres where id = v_row.mcc_id;
++
++  v_variance := abs(p_received_quantity_litres - v_row.declared_quantity_litres);
++
++  update public.mcc_handovers set
++    received_quantity_litres = p_received_quantity_litres,
++    received_by = v_uid,
++    received_at = now(),
++    receipt_notes = p_notes,
++    status = case when v_variance > coalesce(v_tolerance, 2) then 'variance_flagged' else 'received' end
++  where id = p_handover_id
++  returning * into v_row;
++
++  if v_row.status = 'variance_flagged' then
++    insert into public.trip_exceptions (trip_id, agent_id, mcc_id, type, reason, status, created_by)
++    values (
++      v_row.trip_id, v_row.agent_id, v_row.mcc_id, 'quantity_mismatch',
++      format(
++        'MCC handover variance: declared %s L, received %s L (%s L difference).',
++        v_row.declared_quantity_litres, v_row.received_quantity_litres, v_row.variance_litres
++      ),
++      'open', v_uid
++    );
++  end if;
++
++  return v_row;
++end;
++$function$;
++
++create or replace function public.acknowledge_handover_variance(p_handover_id uuid, p_reason text)
++returns public.mcc_handovers
++language plpgsql
++security definer
++set search_path to 'public'
++as $function$
++declare
++  v_uid uuid := auth.uid();
++  v_row public.mcc_handovers;
++begin
++  if p_reason is null or length(trim(p_reason)) = 0 then
++    raise exception 'A reason is required to acknowledge this variance.';
++  end if;
++
++  select * into v_row from public.mcc_handovers where id = p_handover_id;
++  if not found then
++    raise exception 'Handover not found.';
++  end if;
++
++  if not (
++    public.has_role(v_uid, 'owner')
++    or (v_row.mcc_id in (select public.user_mcc_ids(v_uid)))
++  ) then
++    raise exception 'Only a manager or owner at this centre can acknowledge variance.';
++  end if;
++
++  if v_row.status <> 'variance_flagged' then
++    raise exception 'This handover has no open variance to acknowledge.';
++  end if;
++
++  update public.mcc_handovers set
++    status = 'acknowledged',
++    variance_acknowledged_by = v_uid,
++    variance_acknowledged_at = now(),
++    variance_reason = trim(p_reason)
++  where id = p_handover_id
++  returning * into v_row;
++
++  update public.trip_exceptions set
++    status = 'resolved',
++    resolved_by = v_uid,
++    resolved_at = now()
++  where trip_id = v_row.trip_id and type = 'quantity_mismatch' and status = 'open';
++
++  return v_row;
++end;
++$function$;
++
++grant execute on function public.create_mcc_handover(uuid) to authenticated;
++grant execute on function public.record_mcc_handover_receipt(uuid, numeric, text) to authenticated;
++grant execute on function public.acknowledge_handover_variance(uuid, text) to authenticated;

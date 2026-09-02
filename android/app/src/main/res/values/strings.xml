@@ -1,0 +1,17 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">DairyOne</string>
+    <string name="title_activity_main">DairyOne</string>
+    <string name="package_name">com.dairyone.agent</string>
+    <string name="custom_url_scheme">com.dairyone.agent</string>
+
+    <!-- @capacitor-community/background-geolocation — the persistent
+         notification shown while a trip's route is being tracked with the
+         screen locked/app backgrounded (§ live tracking, useLiveLocation.ts). -->
+    <string name="capacitor_background_geolocation_notification_channel_name">
+        Route tracking
+    </string>
+    <string name="capacitor_background_geolocation_notification_color">
+        #2B4EA8
+    </string>
+</resources>

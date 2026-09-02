@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme">
+        <activity
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
+            android:name=".MainActivity"
+            android:label="@string/title_activity_main"
+            android:theme="@style/AppTheme.NoActionBarLaunch"
+            android:launchMode="singleTask"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
+        </provider>
+    </application>
+
+    <!-- Permissions -->
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Agent Punch attendance uses the browser Geolocation API for a
+         one-off fix, which needs these regardless of tracking mode. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Live route tracking (useLiveLocation.ts → src/lib/native-geo.ts) now
+         runs through @capacitor-community/background-geolocation on native
+         builds, which keeps delivering GPS fixes with the screen locked or
+         the app backgrounded via a foreground service — see the persistent
+         "Route tracking" notification it shows while a trip is active.
+         Its own AndroidManifest.xml (merged automatically at build time)
+         declares FOREGROUND_SERVICE, FOREGROUND_SERVICE_LOCATION and
+         POST_NOTIFICATIONS for that service, so they don't need repeating
+         here.
+
+         ACCESS_BACKGROUND_LOCATION is declared below even though the
+         plugin's foreground service doesn't strictly need it (its Java
+         source only ever requests fine/coarse at runtime) — it costs
+         nothing for a sideloaded, personal-business app with no Play
+         Console review, and it means location keeps working from this app
+         even if you swap the tracking mechanism later. -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+
+    <!-- QR scanning at collection stops (src/components/qr-scanner.tsx,
+         used from trip.tsx/collect.tsx) calls getUserMedia via html5-qrcode.
+         `required="false"` on the feature so the app still installs on a
+         device without a camera — the component already has a manual-entry
+         fallback for that case. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+
+    <!-- device-check.tsx reads Notification.permission as one of its
+         readiness checks and already degrades gracefully (shows "Not
+         supported") if the API is missing — which is likely on stock
+         Android WebView, since it doesn't implement the web Notification
+         API the way Chrome does. POST_NOTIFICATIONS (Android 13+) is
+         declared for forward-compat; see SETUP_NOTES.md for the plugin
+         swap that would make this check meaningful on Android. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+</manifest>

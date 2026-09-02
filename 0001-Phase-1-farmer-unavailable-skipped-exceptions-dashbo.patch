@@ -1,0 +1,730 @@
+From 15a08aacaf9322041cdff01daa84c92877cbfca4 Mon Sep 17 00:00:00 2001
+From: DairyOne Agent <agent@dairyone.local>
+Date: Tue, 18 Aug 2026 07:29:08 +0000
+Subject: [PATCH] Phase 1: farmer unavailable/skipped exceptions, dashboard
+ next-action + exception count
+
+- trip_exceptions table (farmer_unavailable, farmer_skipped, route_issue,
+  other) with RLS mirroring route_deviations.
+- Agent can log a per-farmer exception from the trip screen (both the
+  current-stop card and the all-stops list); an excepted farmer now
+  resolves its stop the same way a collection does, so a genuinely
+  unavailable farmer no longer permanently blocks route completion.
+- 'Report issue' button on the current stop for route-level/other issues.
+- Agent dashboard: next-action subtitle shows the next uncollected
+  farmer's name on an active trip, and an open-exceptions count card
+  appears when any are logged today.
+- Regenerated supabase types.ts from the live schema (was stale --
+  missing route_assignments/route_change_requests/route_deviations/
+  trip_exceptions).
+---
+ src/integrations/supabase/types.ts            | 128 +++++++--
+ src/routes/_authenticated/agent.tsx           |  83 +++++-
+ src/routes/_authenticated/trip.tsx            | 268 ++++++++++++++----
+ .../20260818120000_part1_trip_exceptions.sql  |  54 ++++
+ 4 files changed, 459 insertions(+), 74 deletions(-)
+ create mode 100644 supabase/migrations/20260818120000_part1_trip_exceptions.sql
+
+diff --git a/src/integrations/supabase/types.ts b/src/integrations/supabase/types.ts
+index 842f20b..ecc2909 100644
+--- a/src/integrations/supabase/types.ts
++++ b/src/integrations/supabase/types.ts
+@@ -1724,6 +1724,90 @@ export type Database = {
+           },
+         ]
+       }
++      trip_exceptions: {
++        Row: {
++          agent_id: string
++          created_at: string
++          created_by: string | null
++          farmer_id: string | null
++          id: string
++          mcc_id: string
++          reason: string | null
++          resolved_at: string | null
++          resolved_by: string | null
++          route_point_id: string | null
++          status: string
++          trip_id: string
++          type: string
++        }
++        Insert: {
++          agent_id: string
++          created_at?: string
++          created_by?: string | null
++          farmer_id?: string | null
++          id?: string
++          mcc_id: string
++          reason?: string | null
++          resolved_at?: string | null
++          resolved_by?: string | null
++          route_point_id?: string | null
++          status?: string
++          trip_id: string
++          type: string
++        }
++        Update: {
++          agent_id?: string
++          created_at?: string
++          created_by?: string | null
++          farmer_id?: string | null
++          id?: string
++          mcc_id?: string
++          reason?: string | null
++          resolved_at?: string | null
++          resolved_by?: string | null
++          route_point_id?: string | null
++          status?: string
++          trip_id?: string
++          type?: string
++        }
++        Relationships: [
++          {
++            foreignKeyName: "trip_exceptions_agent_id_fkey"
++            columns: ["agent_id"]
++            isOneToOne: false
++            referencedRelation: "agents"
++            referencedColumns: ["id"]
++          },
++          {
++            foreignKeyName: "trip_exceptions_farmer_id_fkey"
++            columns: ["farmer_id"]
++            isOneToOne: false
++            referencedRelation: "farmers"
++            referencedColumns: ["id"]
++          },
++          {
++            foreignKeyName: "trip_exceptions_mcc_id_fkey"
++            columns: ["mcc_id"]
++            isOneToOne: false
++            referencedRelation: "mcc_centres"
++            referencedColumns: ["id"]
++          },
++          {
++            foreignKeyName: "trip_exceptions_route_point_id_fkey"
++            columns: ["route_point_id"]
++            isOneToOne: false
++            referencedRelation: "route_points"
++            referencedColumns: ["id"]
++          },
++          {
++            foreignKeyName: "trip_exceptions_trip_id_fkey"
++            columns: ["trip_id"]
++            isOneToOne: false
++            referencedRelation: "route_trips"
++            referencedColumns: ["id"]
++          },
++        ]
++      }
+       user_roles: {
+         Row: {
+           created_at: string
+@@ -1775,31 +1859,31 @@ export type Database = {
+       is_staff: { Args: { _user_id: string }; Returns: boolean }
+       record_milk_collection: {
+         Args: {
+-          p_acidity: number | null
++          p_acidity: number
+           p_animal_type: string
+-          p_antibiotic_test_result: string | null
+-          p_client_ref: string | null
+-          p_clr: number | null
+-          p_collected_at: string | null
++          p_antibiotic_test_result: string
++          p_client_ref: string
++          p_clr: number
++          p_collected_at: string
+           p_farmer_id: string
+-          p_fat_pct: number | null
+-          p_gps_accuracy: number | null
+-          p_gps_lat: number | null
+-          p_gps_lng: number | null
++          p_fat_pct: number
++          p_gps_accuracy: number
++          p_gps_lat: number
++          p_gps_lng: number
+           p_mcc_id: string
+           p_quantity_litres: number
+           p_rate_per_litre: number
+-          p_risk_score: number | null
+-          p_route_point_id: string | null
++          p_risk_score: number
++          p_route_point_id: string
+           p_session: string
+-          p_signature_url: string | null
+-          p_snf_pct: number | null
++          p_signature_url: string
++          p_snf_pct: number
+           p_source: string
+-          p_temperature: number | null
++          p_temperature: number
+           p_total_amount: number
+-          p_trip_id: string | null
++          p_trip_id: string
+           p_water_adulteration_flag: boolean
+-          p_water_adulteration_pct: number | null
++          p_water_adulteration_pct: number
+         }
+         Returns: {
+           acidity: number | null
+@@ -1840,13 +1924,19 @@ export type Database = {
+           water_adulteration_flag: boolean
+           water_adulteration_pct: number | null
+         }
++        SetofOptions: {
++          from: "*"
++          to: "milk_collections"
++          isOneToOne: true
++          isSetofReturn: false
++        }
+       }
+       save_marked_route: {
+         Args: {
+-          p_distance_meters: number | null
+-          p_duration_seconds: number | null
++          p_distance_meters: number
++          p_duration_seconds: number
+           p_name: string
+-          p_polyline: string | null
++          p_polyline: string
+           p_stops: Json
+           p_trip_id: string
+         }
+diff --git a/src/routes/_authenticated/agent.tsx b/src/routes/_authenticated/agent.tsx
+index 093450c..5ffa496 100644
+--- a/src/routes/_authenticated/agent.tsx
++++ b/src/routes/_authenticated/agent.tsx
+@@ -1,6 +1,15 @@
+ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+-import { Fingerprint, Navigation, WifiOff, Milk, CheckCircle2, RefreshCw, MapPinned } from "lucide-react";
++import {
++  Fingerprint,
++  Navigation,
++  WifiOff,
++  Milk,
++  CheckCircle2,
++  RefreshCw,
++  MapPinned,
++  AlertTriangle,
++} from "lucide-react";
+ import { toast } from "sonner";
+ import { supabase } from "@/integrations/supabase/client";
+ import { AppShell, PageHeading, StatCard } from "@/components/app-shell";
+@@ -96,6 +105,55 @@ function AgentHome() {
+     },
+   });
+ 
++  const { data: openExceptions } = useQuery({
++    queryKey: ["agent-open-exceptions", agent?.agentId],
++    enabled: Boolean(agent?.agentId),
++    queryFn: async () => {
++      const { count } = await supabase
++        .from("trip_exceptions")
++        .select("id", { count: "exact", head: true })
++        .eq("agent_id", agent!.agentId)
++        .eq("status", "open")
++        .gte("created_at", `${today()}T00:00:00Z`);
++      return count ?? 0;
++    },
++  });
++
++  // Next action: the first farmer on the active trip's route who is neither
++  // collected nor already excused via an exception.
++  const { data: nextFarmer } = useQuery({
++    queryKey: ["agent-next-farmer", trip?.id],
++    enabled: Boolean(trip?.id && trip.route_id),
++    queryFn: async () => {
++      const { data: points } = await supabase
++        .from("route_points")
++        .select("id, sequence, route_point_farmers(farmer_id, sequence, farmers(full_name))")
++        .eq("route_id", trip!.route_id as string)
++        .order("sequence");
++      const [{ data: collections }, { data: excepted }] = await Promise.all([
++        supabase.from("milk_collections").select("farmer_id").eq("trip_id", trip!.id),
++        supabase
++          .from("trip_exceptions")
++          .select("farmer_id")
++          .eq("trip_id", trip!.id)
++          .not("farmer_id", "is", null),
++      ]);
++      const resolved = new Set([
++        ...(collections ?? []).map((c) => c.farmer_id),
++        ...(excepted ?? []).map((e) => e.farmer_id as string),
++      ]);
++      for (const point of points ?? []) {
++        const farmers = [...(point.route_point_farmers ?? [])].sort(
++          (a, b) => a.sequence - b.sequence,
++        );
++        for (const f of farmers) {
++          if (!resolved.has(f.farmer_id)) return f.farmers?.full_name ?? null;
++        }
++      }
++      return null;
++    },
++  });
++
+   const punch = useMutation({
+     mutationFn: async () => {
+       const coords = await getCoords();
+@@ -162,9 +220,13 @@ function AgentHome() {
+       <PageHeading
+         title={`Namaste${user?.fullName ? `, ${user.fullName}` : ""}`}
+         subtitle={
+-          agent?.routeName
+-            ? `Route: ${agent.routeName}`
+-            : "Punch in, then start your route."
++          trip?.status === "in_progress" && nextFarmer
++            ? `Next: ${nextFarmer}`
++            : trip?.status === "in_progress"
++              ? "All farmers on this route are done."
++              : agent?.routeName
++                ? `Route: ${agent.routeName}`
++                : "Punch in, then start your route."
+         }
+       />
+ 
+@@ -189,7 +251,9 @@ function AgentHome() {
+           variant="outline"
+           className="touch-tile h-16 text-base"
+           disabled={!agent || !punchedIn || startTrip.isPending}
+-          onClick={() => (trip?.status === "in_progress" ? navigate({ to: "/trip" }) : startTrip.mutate())}
++          onClick={() =>
++            trip?.status === "in_progress" ? navigate({ to: "/trip" }) : startTrip.mutate()
++          }
+         >
+           <Navigation className="h-5 w-5" />
+           {trip?.status === "in_progress" ? "Continue trip" : "Start trip"}
+@@ -234,6 +298,15 @@ function AgentHome() {
+         )}
+       </div>
+ 
++      {Boolean(openExceptions) && (
++        <div className="surface-card mt-5 flex items-center gap-3 border-accent/40 bg-accent/5 p-4">
++          <AlertTriangle className="h-5 w-5 text-accent" />
++          <p className="flex-1 text-sm text-muted-foreground">
++            {openExceptions} open exception{openExceptions === 1 ? "" : "s"} logged today.
++          </p>
++        </div>
++      )}
++
+       {!agent?.routeId && agent && (
+         <div className="surface-card mt-5 flex flex-col items-center p-8 text-center">
+           <Milk className="h-7 w-7 text-primary" />
+diff --git a/src/routes/_authenticated/trip.tsx b/src/routes/_authenticated/trip.tsx
+index f739280..4c159d7 100644
+--- a/src/routes/_authenticated/trip.tsx
++++ b/src/routes/_authenticated/trip.tsx
+@@ -12,6 +12,7 @@ import {
+   Navigation2,
+   QrCode,
+   LockKeyhole,
++  AlertTriangle,
+ } from "lucide-react";
+ import { toast } from "sonner";
+ 
+@@ -19,6 +20,14 @@ import { supabase } from "@/integrations/supabase/client";
+ import { AppShell, PageHeading } from "@/components/app-shell";
+ import { Button } from "@/components/ui/button";
+ import { Badge } from "@/components/ui/badge";
++import { Textarea } from "@/components/ui/textarea";
++import {
++  Select,
++  SelectContent,
++  SelectItem,
++  SelectTrigger,
++  SelectValue,
++} from "@/components/ui/select";
+ 
+ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+ 
+@@ -94,6 +103,16 @@ function TripScreen() {
+ 
+   const [scanOpen, setScanOpen] = useState(false);
+ 
++  // PHASE 1 §5 — Exception Basics. `exceptionTarget` is either a farmer
++  // (unavailable/skipped) or null with routePointId set (route issue/other).
++  const [exceptionTarget, setExceptionTarget] = useState<{
++    farmerId: string | null;
++    farmerName: string | null;
++    routePointId: string | null;
++  } | null>(null);
++  const [exceptionType, setExceptionType] = useState("farmer_unavailable");
++  const [exceptionReason, setExceptionReason] = useState("");
++
+   /*
+    * ACTIVE TRIP
+    */
+@@ -328,6 +347,55 @@ function TripScreen() {
+     0,
+   );
+ 
++  /*
++   * TRIP EXCEPTIONS — farmer unavailable/skipped resolves a stop without a
++   * collection; route issue/other are trip-level and don't block anything.
++   */
++
++  const { data: exceptions = [] } = useQuery({
++    queryKey: ["trip-exceptions", trip?.id],
++    enabled: Boolean(trip?.id),
++    queryFn: async () => {
++      const { data, error } = await supabase
++        .from("trip_exceptions")
++        .select("id, farmer_id, route_point_id, type, reason, status")
++        .eq("trip_id", trip!.id);
++      if (error) {
++        console.error("TRIP EXCEPTIONS ERROR:", error);
++        throw error;
++      }
++      return data ?? [];
++    },
++  });
++
++  const exceptedFarmers = new Set(
++    exceptions.filter((e) => e.farmer_id).map((e) => e.farmer_id as string),
++  );
++  const openExceptionCount = exceptions.filter((e) => e.status === "open").length;
++
++  const logException = useMutation({
++    mutationFn: async () => {
++      if (!trip || !agent || !exceptionTarget) return;
++      const { error } = await supabase.from("trip_exceptions").insert({
++        trip_id: trip.id,
++        agent_id: agent.agentId,
++        mcc_id: agent.mccId,
++        route_point_id: exceptionTarget.routePointId,
++        farmer_id: exceptionTarget.farmerId,
++        type: exceptionType,
++        reason: exceptionReason || null,
++      });
++      if (error) throw error;
++    },
++    onSuccess: () => {
++      toast.success("Exception logged");
++      setExceptionTarget(null);
++      setExceptionReason("");
++      void queryClient.invalidateQueries({ queryKey: ["trip-exceptions"] });
++    },
++    onError: (error: Error) => toast.error(error.message),
++  });
++
+   /*
+    * ALL FARMERS FOR QR SCANNING
+    */
+@@ -367,7 +435,10 @@ function TripScreen() {
+    */
+ 
+   const stopStatus = (point: PointWithFarmers): "done" | "current" | "upcoming" => {
+-    if (point.farmers.length > 0 && point.farmers.every((f) => collectedFarmers.has(f.id))) {
++    if (
++      point.farmers.length > 0 &&
++      point.farmers.every((f) => collectedFarmers.has(f.id) || exceptedFarmers.has(f.id))
++    ) {
+       return "done";
+     }
+     return "upcoming"; // resolved to "current" for the first one below
+@@ -607,6 +678,62 @@ function TripScreen() {
+     );
+   }
+ 
++  function farmerAction(farmer: Farmer, pointId: string) {
++    if (collectedFarmers.has(farmer.id)) {
++      return (
++        <Badge variant="secondary">
++          <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
++          Done
++        </Badge>
++      );
++    }
++    const exception = exceptions.find((e) => e.farmer_id === farmer.id);
++    if (exception) {
++      return (
++        <Badge variant="outline">
++          <AlertTriangle className="mr-1 h-3.5 w-3.5" />
++          {exception.type === "farmer_unavailable" ? "Unavailable" : "Skipped"}
++        </Badge>
++      );
++    }
++    return (
++      <div className="flex shrink-0 gap-1.5">
++        <Button
++          size="sm"
++          onClick={() =>
++            setTarget({
++              farmerId: farmer.id,
++              farmerName: farmer.full_name,
++              farmerCode: farmer.farmer_code,
++              mccId: agent!.mccId,
++              agentId: agent!.agentId,
++              routePointId: pointId,
++              tripId: trip!.id,
++              source: "agent",
++            })
++          }
++        >
++          Collect
++        </Button>
++        <Button
++          size="sm"
++          variant="outline"
++          title="Farmer unavailable / skip"
++          onClick={() => {
++            setExceptionType("farmer_unavailable");
++            setExceptionTarget({
++              farmerId: farmer.id,
++              farmerName: farmer.full_name,
++              routePointId: pointId,
++            });
++          }}
++        >
++          <AlertTriangle className="h-3.5 w-3.5" />
++        </Button>
++      </div>
++    );
++  }
++
+   const loadingFarmers = pointsLoading || assignmentsLoading || farmersLoading;
+   const doneCount =
+     points.length - (firstIncompleteIndex === -1 ? 0 : points.length - firstIncompleteIndex);
+@@ -616,7 +743,11 @@ function TripScreen() {
+     <AppShell mobileFirst>
+       <PageHeading
+         title={agent?.routeName ?? "Today's route"}
+-        subtitle={`${collectedFarmers.size} farmers done · ${totalLitres.toFixed(1)} L collected`}
++        subtitle={`${collectedFarmers.size} farmers done · ${totalLitres.toFixed(1)} L collected${
++          openExceptionCount > 0
++            ? ` · ${openExceptionCount} open exception${openExceptionCount === 1 ? "" : "s"}`
++            : ""
++        }`}
+       />
+ 
+       {!online && (
+@@ -710,6 +841,21 @@ function TripScreen() {
+                 <MapPin className="h-4 w-4" />
+                 {openPoint === currentStop.id ? "Hide farmers" : "View farmers"}
+               </Button>
++              <Button
++                variant="outline"
++                className="h-11"
++                onClick={() => {
++                  setExceptionType("route_issue");
++                  setExceptionTarget({
++                    farmerId: null,
++                    farmerName: null,
++                    routePointId: currentStop.id,
++                  });
++                }}
++              >
++                <AlertTriangle className="h-4 w-4" />
++                Report issue
++              </Button>
+             </div>
+ 
+             {openPoint === currentStop.id && (
+@@ -723,30 +869,7 @@ function TripScreen() {
+                         {farmer.village ? ` · ${farmer.village}` : ""}
+                       </p>
+                     </div>
+-                    {collectedFarmers.has(farmer.id) ? (
+-                      <Badge variant="secondary">
+-                        <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
+-                        Done
+-                      </Badge>
+-                    ) : (
+-                      <Button
+-                        size="sm"
+-                        onClick={() =>
+-                          setTarget({
+-                            farmerId: farmer.id,
+-                            farmerName: farmer.full_name,
+-                            farmerCode: farmer.farmer_code,
+-                            mccId: agent!.mccId,
+-                            agentId: agent!.agentId,
+-                            routePointId: currentStop.id,
+-                            tripId: trip.id,
+-                            source: "agent",
+-                          })
+-                        }
+-                      >
+-                        Collect
+-                      </Button>
+-                    )}
++                    {farmerAction(farmer, currentStop.id)}
+                   </li>
+                 ))}
+                 {currentStop.farmers.length === 0 && (
+@@ -839,34 +962,21 @@ function TripScreen() {
+                         </p>
+                       </div>
+ 
+-                      {collectedFarmers.has(farmer.id) ? (
+-                        <Badge variant="secondary">
+-                          <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
+-                          Done
+-                        </Badge>
+-                      ) : sequenceLocked && point.id !== currentStop?.id ? (
+-                        <Button size="sm" variant="outline" disabled title="Complete earlier stops first">
+-                          <LockKeyhole className="h-3.5 w-3.5" />
+-                          Locked
+-                        </Button>
+-                      ) : (
++                      {!collectedFarmers.has(farmer.id) &&
++                      !exceptions.some((e) => e.farmer_id === farmer.id) &&
++                      sequenceLocked &&
++                      point.id !== currentStop?.id ? (
+                         <Button
+                           size="sm"
+-                          onClick={() =>
+-                            setTarget({
+-                              farmerId: farmer.id,
+-                              farmerName: farmer.full_name,
+-                              farmerCode: farmer.farmer_code,
+-                              mccId: agent!.mccId,
+-                              agentId: agent!.agentId,
+-                              routePointId: point.id,
+-                              tripId: trip.id,
+-                              source: "agent",
+-                            })
+-                          }
++                          variant="outline"
++                          disabled
++                          title="Complete earlier stops first"
+                         >
+-                          Collect
++                          <LockKeyhole className="h-3.5 w-3.5" />
++                          Locked
+                         </Button>
++                      ) : (
++                        farmerAction(farmer, point.id)
+                       )}
+                     </li>
+                   ))}
+@@ -970,6 +1080,64 @@ function TripScreen() {
+           )}
+         </DialogContent>
+       </Dialog>
++
++      {/* EXCEPTION — farmer unavailable/skipped, or a route-level issue */}
++
++      <Dialog
++        open={Boolean(exceptionTarget)}
++        onOpenChange={(open) => {
++          if (!open) {
++            setExceptionTarget(null);
++            setExceptionReason("");
++          }
++        }}
++      >
++        <DialogContent className="sm:max-w-sm">
++          <DialogHeader>
++            <DialogTitle>
++              {exceptionTarget?.farmerName
++                ? `Report issue — ${exceptionTarget.farmerName}`
++                : "Report route issue"}
++            </DialogTitle>
++          </DialogHeader>
++
++          <div className="space-y-3">
++            <Select value={exceptionType} onValueChange={setExceptionType}>
++              <SelectTrigger className="h-12">
++                <SelectValue />
++              </SelectTrigger>
++              <SelectContent>
++                {exceptionTarget?.farmerId ? (
++                  <>
++                    <SelectItem value="farmer_unavailable">Farmer unavailable</SelectItem>
++                    <SelectItem value="farmer_skipped">Farmer skipped</SelectItem>
++                  </>
++                ) : (
++                  <>
++                    <SelectItem value="route_issue">Route issue</SelectItem>
++                    <SelectItem value="other">Other</SelectItem>
++                  </>
++                )}
++              </SelectContent>
++            </Select>
++
++            <Textarea
++              placeholder="Reason (optional)"
++              value={exceptionReason}
++              onChange={(e) => setExceptionReason(e.target.value)}
++            />
++
++            <Button
++              size="lg"
++              className="h-12 w-full"
++              disabled={logException.isPending}
++              onClick={() => logException.mutate()}
++            >
++              Log exception
++            </Button>
++          </div>
++        </DialogContent>
++      </Dialog>
+     </AppShell>
+   );
+ }
+diff --git a/supabase/migrations/20260818120000_part1_trip_exceptions.sql b/supabase/migrations/20260818120000_part1_trip_exceptions.sql
+new file mode 100644
+index 0000000..8ad50ed
+--- /dev/null
++++ b/supabase/migrations/20260818120000_part1_trip_exceptions.sql
+@@ -0,0 +1,54 @@
++-- PHASE 1 §5 — Exception Basics
++-- Structured statuses for: farmer unavailable, farmer skipped, route issue, other.
++-- Mirrors the route_deviations RLS shape already in use (agent owns their rows,
++-- manager/owner see everything in their mcc).
++
++create table public.trip_exceptions (
++  id uuid primary key default gen_random_uuid(),
++  trip_id uuid not null references public.route_trips(id),
++  agent_id uuid not null references public.agents(id),
++  mcc_id uuid not null references public.mcc_centres(id),
++  route_point_id uuid references public.route_points(id),
++  farmer_id uuid references public.farmers(id),
++  type text not null check (type in ('farmer_unavailable', 'farmer_skipped', 'route_issue', 'other')),
++  reason text,
++  status text not null default 'open' check (status in ('open', 'resolved')),
++  created_by uuid references auth.users(id),
++  created_at timestamptz not null default now(),
++  resolved_at timestamptz,
++  resolved_by uuid references auth.users(id)
++);
++
++create index trip_exceptions_trip_id_idx on public.trip_exceptions (trip_id);
++create index trip_exceptions_farmer_id_idx on public.trip_exceptions (farmer_id);
++
++alter table public.trip_exceptions enable row level security;
++
++create policy "exceptions inserted by agent or manager" on public.trip_exceptions
++  for insert
++  with check (
++    has_role(auth.uid(), 'owner'::app_role)
++    or (has_role(auth.uid(), 'manager'::app_role) and mcc_id in (select user_mcc_ids(auth.uid())))
++    or (agent_id in (select a.id from public.agents a where a.profile_id = auth.uid()))
++  );
++
++create policy "exceptions readable" on public.trip_exceptions
++  for select
++  using (
++    has_role(auth.uid(), 'owner'::app_role)
++    or (mcc_id in (select user_mcc_ids(auth.uid())))
++    or (agent_id in (select a.id from public.agents a where a.profile_id = auth.uid()))
++  );
++
++create policy "exceptions updated by agent or manager" on public.trip_exceptions
++  for update
++  using (
++    has_role(auth.uid(), 'owner'::app_role)
++    or (has_role(auth.uid(), 'manager'::app_role) and mcc_id in (select user_mcc_ids(auth.uid())))
++    or (agent_id in (select a.id from public.agents a where a.profile_id = auth.uid()))
++  )
++  with check (
++    has_role(auth.uid(), 'owner'::app_role)
++    or (has_role(auth.uid(), 'manager'::app_role) and mcc_id in (select user_mcc_ids(auth.uid())))
++    or (agent_id in (select a.id from public.agents a where a.profile_id = auth.uid()))
++  );
+-- 
+2.43.0
+

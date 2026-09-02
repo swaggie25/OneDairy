@@ -1,0 +1,2329 @@
+diff --git a/src/components/agent-trip-map.tsx b/src/components/agent-trip-map.tsx
+index 2b7a33f..0a4abf4 100644
+--- a/src/components/agent-trip-map.tsx
++++ b/src/components/agent-trip-map.tsx
+@@ -1,169 +1,178 @@
+-/// <reference types="google.maps" />
+-import { useEffect, useMemo, useRef, useState } from "react";
+-import { decodePolyline, loadGoogleMaps } from "@/lib/google-maps-loader";
+-import type { LiveCoords } from "@/hooks/useLiveLocation";
+-
+-export type TripStop = {
+-  id: string;
+-  name: string;
+-  sequence: number;
+-  lat: number | null;
+-  lng: number | null;
+-  status: "done" | "current" | "upcoming";
+-};
+-
+-export type AgentTripMapProps = {
+-  currentPos: LiveCoords | null;
+-  centre: { name: string; lat: number | null; lng: number | null } | null | undefined;
+-  stops: TripStop[];
+-  directionsPolyline?: string | null;
+-  heightClassName?: string;
+-};
+-
+-const STATUS_COLOR: Record<TripStop["status"], string> = {
+-  done: "#16a34a",
+-  current: "#ea580c",
+-  upcoming: "#94a3b8",
+-};
+-
+-export default function AgentTripMap({
+-  currentPos,
+-  centre,
+-  stops,
+-  directionsPolyline,
+-  heightClassName = "h-56",
+-}: AgentTripMapProps) {
+-  const containerRef = useRef<HTMLDivElement | null>(null);
+-  const mapRef = useRef<google.maps.Map | null>(null);
+-  const overlaysRef = useRef<Array<google.maps.Marker | google.maps.Polyline>>([]);
+-  const [ready, setReady] = useState(false);
+-  const [error, setError] = useState<string | null>(null);
+-  const fittedOnceRef = useRef(false);
+-
+-  useEffect(() => {
+-    let cancelled = false;
+-    loadGoogleMaps()
+-      .then((maps) => {
+-        if (cancelled || !containerRef.current) return;
+-        mapRef.current = new maps.Map(containerRef.current, {
+-          center:
+-            centre?.lat != null && centre.lng != null
+-              ? { lat: centre.lat, lng: centre.lng }
+-              : { lat: 22.3072, lng: 73.1812 },
+-          zoom: 13,
+-          disableDefaultUI: true,
+-          zoomControl: true,
+-          gestureHandling: "greedy",
+-        });
+-        setReady(true);
+-      })
+-      .catch((e: Error) => !cancelled && setError(e.message));
+-    return () => {
+-      cancelled = true;
+-    };
+-    // eslint-disable-next-line react-hooks/exhaustive-deps
+-  }, []);
+-
+-  const validStops = useMemo(() => stops.filter((s) => s.lat != null && s.lng != null), [stops]);
+-
+-  useEffect(() => {
+-    const map = mapRef.current;
+-    const maps = typeof window !== "undefined" ? window.google?.maps : undefined;
+-    if (!ready || !map || !maps) return;
+-
+-    for (const o of overlaysRef.current) o.setMap(null);
+-    overlaysRef.current = [];
+-
+-    const bounds = new maps.LatLngBounds();
+-    let hasBounds = false;
+-
+-    for (const s of validStops) {
+-      const marker = new maps.Marker({
+-        map,
+-        position: { lat: s.lat!, lng: s.lng! },
+-        label: {
+-          text: String(s.sequence),
+-          color: "#ffffff",
+-          fontSize: "11px",
+-          fontWeight: "700",
+-        },
+-        icon: {
+-          path: maps.SymbolPath.CIRCLE,
+-          scale: s.status === "current" ? 11 : 9,
+-          fillColor: STATUS_COLOR[s.status],
+-          fillOpacity: 1,
+-          strokeColor: "#ffffff",
+-          strokeWeight: 2,
+-        },
+-        zIndex: s.status === "current" ? 20 : 5,
+-        title: s.name,
+-      });
+-      overlaysRef.current.push(marker);
+-      bounds.extend({ lat: s.lat!, lng: s.lng! });
+-      hasBounds = true;
+-    }
+-
+-    if (currentPos) {
+-      const marker = new maps.Marker({
+-        map,
+-        position: { lat: currentPos.lat, lng: currentPos.lng },
+-        icon:
+-          currentPos.heading != null
+-            ? {
+-                path: maps.SymbolPath.FORWARD_CLOSED_ARROW,
+-                scale: 6,
+-                rotation: currentPos.heading,
+-                fillColor: "#2563eb",
+-                fillOpacity: 1,
+-                strokeColor: "#ffffff",
+-                strokeWeight: 2,
+-              }
+-            : {
+-                path: maps.SymbolPath.CIRCLE,
+-                scale: 9,
+-                fillColor: "#2563eb",
+-                fillOpacity: 1,
+-                strokeColor: "#ffffff",
+-                strokeWeight: 3,
+-              },
+-        zIndex: 30,
+-        title: "You",
+-      });
+-      overlaysRef.current.push(marker);
+-      bounds.extend({ lat: currentPos.lat, lng: currentPos.lng });
+-      hasBounds = true;
+-    }
+-
+-    if (directionsPolyline) {
+-      const path = decodePolyline(directionsPolyline);
+-      const line = new maps.Polyline({
+-        map,
+-        path,
+-        strokeColor: "#2563eb",
+-        strokeOpacity: 0.7,
+-        strokeWeight: 5,
+-      });
+-      overlaysRef.current.push(line);
+-    }
+-
+-    if (hasBounds && !fittedOnceRef.current) {
+-      map.fitBounds(bounds, 40);
+-      fittedOnceRef.current = true;
+-    } else if (hasBounds && currentPos) {
+-      // Keep following the agent without yanking zoom around on every ping.
+-      map.panTo({ lat: currentPos.lat, lng: currentPos.lng });
+-    }
+-  }, [ready, validStops, currentPos, directionsPolyline]);
+-
+-  if (error) {
+-    return (
+-      <div
+-        className={`flex ${heightClassName} items-center justify-center rounded-xl bg-secondary px-4 text-center text-xs text-muted-foreground`}
+-      >
+-        {error}
+-      </div>
+-    );
+-  }
+-
+-  return <div ref={containerRef} className={`${heightClassName} w-full rounded-xl`} />;
+-}
++/// <reference types="google.maps" />
++import { useEffect, useMemo, useRef, useState } from "react";
++import { decodePolyline, loadGoogleMaps } from "@/lib/google-maps-loader";
++import type { LiveCoords } from "@/hooks/useLiveLocation";
++
++export type TripStop = {
++  id: string;
++  name: string;
++  sequence: number;
++  lat: number | null;
++  lng: number | null;
++  status: "done" | "current" | "upcoming" | "problem";
++};
++
++export type AgentTripMapProps = {
++  currentPos: LiveCoords | null;
++  centre: { name: string; lat: number | null; lng: number | null } | null | undefined;
++  stops: TripStop[];
++  directionsPolyline?: string | null;
++  heightClassName?: string;
++};
++
++/*
++ * Google Maps' Marker API takes a raw hex fillColor — it renders on a
++ * canvas, not the DOM, so it can't read our --color-status-* CSS custom
++ * properties directly. These hex values are computed from the exact same
++ * oklch definitions in styles.css, so the map pins and the StopPin/
++ * StatusBadge components elsewhere in the app read as the same palette,
++ * even though this one spot can't share the token at runtime.
++ */
++const STATUS_COLOR: Record<TripStop["status"], string> = {
++  done: "#269e5f", // --success
++  current: "#0058c9", // --primary / --status-active
++  upcoming: "#94a3b8", // --muted-foreground family
++  problem: "#ebaa2d", // --warning
++};
++
++export default function AgentTripMap({
++  currentPos,
++  centre,
++  stops,
++  directionsPolyline,
++  heightClassName = "h-56",
++}: AgentTripMapProps) {
++  const containerRef = useRef<HTMLDivElement | null>(null);
++  const mapRef = useRef<google.maps.Map | null>(null);
++  const overlaysRef = useRef<Array<google.maps.Marker | google.maps.Polyline>>([]);
++  const [ready, setReady] = useState(false);
++  const [error, setError] = useState<string | null>(null);
++  const fittedOnceRef = useRef(false);
++
++  useEffect(() => {
++    let cancelled = false;
++    loadGoogleMaps()
++      .then((maps) => {
++        if (cancelled || !containerRef.current) return;
++        mapRef.current = new maps.Map(containerRef.current, {
++          center:
++            centre?.lat != null && centre.lng != null
++              ? { lat: centre.lat, lng: centre.lng }
++              : { lat: 22.3072, lng: 73.1812 },
++          zoom: 13,
++          disableDefaultUI: true,
++          zoomControl: true,
++          gestureHandling: "greedy",
++        });
++        setReady(true);
++      })
++      .catch((e: Error) => !cancelled && setError(e.message));
++    return () => {
++      cancelled = true;
++    };
++    // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, []);
++
++  const validStops = useMemo(() => stops.filter((s) => s.lat != null && s.lng != null), [stops]);
++
++  useEffect(() => {
++    const map = mapRef.current;
++    const maps = typeof window !== "undefined" ? window.google?.maps : undefined;
++    if (!ready || !map || !maps) return;
++
++    for (const o of overlaysRef.current) o.setMap(null);
++    overlaysRef.current = [];
++
++    const bounds = new maps.LatLngBounds();
++    let hasBounds = false;
++
++    for (const s of validStops) {
++      const marker = new maps.Marker({
++        map,
++        position: { lat: s.lat!, lng: s.lng! },
++        label: {
++          text: String(s.sequence),
++          color: "#ffffff",
++          fontSize: "11px",
++          fontWeight: "700",
++        },
++        icon: {
++          path: maps.SymbolPath.CIRCLE,
++          scale: s.status === "current" || s.status === "problem" ? 11 : 9,
++          fillColor: STATUS_COLOR[s.status],
++          fillOpacity: 1,
++          strokeColor: "#ffffff",
++          strokeWeight: 2,
++        },
++        zIndex: s.status === "current" ? 20 : s.status === "problem" ? 15 : 5,
++        title: s.status === "problem" ? `${s.name} — open exception` : s.name,
++      });
++      overlaysRef.current.push(marker);
++      bounds.extend({ lat: s.lat!, lng: s.lng! });
++      hasBounds = true;
++    }
++
++    if (currentPos) {
++      const marker = new maps.Marker({
++        map,
++        position: { lat: currentPos.lat, lng: currentPos.lng },
++        icon:
++          currentPos.heading != null
++            ? {
++                path: maps.SymbolPath.FORWARD_CLOSED_ARROW,
++                scale: 6,
++                rotation: currentPos.heading,
++                fillColor: STATUS_COLOR.current,
++                fillOpacity: 1,
++                strokeColor: "#ffffff",
++                strokeWeight: 2,
++              }
++            : {
++                path: maps.SymbolPath.CIRCLE,
++                scale: 9,
++                fillColor: STATUS_COLOR.current,
++                fillOpacity: 1,
++                strokeColor: "#ffffff",
++                strokeWeight: 3,
++              },
++        zIndex: 30,
++        title: "You",
++      });
++      overlaysRef.current.push(marker);
++      bounds.extend({ lat: currentPos.lat, lng: currentPos.lng });
++      hasBounds = true;
++    }
++
++    if (directionsPolyline) {
++      const path = decodePolyline(directionsPolyline);
++      const line = new maps.Polyline({
++        map,
++        path,
++        strokeColor: STATUS_COLOR.current,
++        strokeOpacity: 0.7,
++        strokeWeight: 5,
++      });
++      overlaysRef.current.push(line);
++    }
++
++    if (hasBounds && !fittedOnceRef.current) {
++      map.fitBounds(bounds, 40);
++      fittedOnceRef.current = true;
++    } else if (hasBounds && currentPos) {
++      // Keep following the agent without yanking zoom around on every ping.
++      map.panTo({ lat: currentPos.lat, lng: currentPos.lng });
++    }
++  }, [ready, validStops, currentPos, directionsPolyline]);
++
++  if (error) {
++    return (
++      <div
++        className={`flex ${heightClassName} items-center justify-center rounded-xl bg-secondary px-4 text-center text-xs text-muted-foreground`}
++      >
++        {error}
++      </div>
++    );
++  }
++
++  return <div ref={containerRef} className={`${heightClassName} w-full rounded-xl`} />;
++}
+diff --git a/src/components/app-shell.tsx b/src/components/app-shell.tsx
+index 6fbf0d7..741a107 100644
+--- a/src/components/app-shell.tsx
++++ b/src/components/app-shell.tsx
+@@ -1,214 +1,214 @@
+-import { Link, useNavigate } from "@tanstack/react-router";
+-import { useQueryClient } from "@tanstack/react-query";
+-import { Milk, LogOut, Menu } from "lucide-react";
+-import type { ReactNode } from "react";
+-import { supabase } from "@/integrations/supabase/client";
+-import { Button } from "@/components/ui/button";
+-import { Badge } from "@/components/ui/badge";
+-import {
+-  Sheet,
+-  SheetClose,
+-  SheetContent,
+-  SheetHeader,
+-  SheetTitle,
+-  SheetTrigger,
+-} from "@/components/ui/sheet";
+-import { useCurrentUser } from "@/hooks/useCurrentUser";
+-import { roleLabel } from "@/lib/i18n";
+-import { cn } from "@/lib/utils";
+-
+-export function BrandMark({ className }: { className?: string }) {
+-  return (
+-    <span
+-      className={cn(
+-        "brand-mark inline-flex h-9 w-9 items-center justify-center rounded-xl",
+-        className,
+-      )}
+-    >
+-      <Milk className="h-5 w-5" />
+-    </span>
+-  );
+-}
+-
+-export function Logo() {
+-  return (
+-    <Link to="/" className="flex items-center gap-2.5">
+-      <BrandMark />
+-      <span className="text-lg font-extrabold tracking-tight">
+-        Dairy<span className="text-primary">One</span>
+-      </span>
+-    </Link>
+-  );
+-}
+-
+-type NavItem = { label: string; to: string };
+-
+-export function AppShell({
+-  children,
+-  nav = [],
+-  mobileFirst = false,
+-}: {
+-  children: ReactNode;
+-  nav?: NavItem[];
+-  mobileFirst?: boolean;
+-}) {
+-  const { data: user } = useCurrentUser();
+-  const navigate = useNavigate();
+-  const queryClient = useQueryClient();
+-
+-  async function signOut() {
+-    await queryClient.cancelQueries();
+-    queryClient.clear();
+-    await supabase.auth.signOut();
+-    navigate({ to: "/auth", replace: true });
+-  }
+-
+-  return (
+-    <div className="min-h-screen bg-background">
+-      <header className="sticky top-0 z-40 border-b border-border bg-card/90 backdrop-blur">
+-        <div
+-          className={cn(
+-            "mx-auto flex h-16 items-center justify-between gap-4 px-4",
+-            mobileFirst ? "max-w-2xl" : "max-w-7xl",
+-          )}
+-        >
+-          <div className="flex items-center gap-6">
+-            <Logo />
+-            {nav.length > 0 && (
+-              <nav className="hidden items-center gap-1 md:flex">
+-                {nav.map((item) => (
+-                  <Link
+-                    key={item.to}
+-                    to={item.to}
+-                    className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+-                    activeProps={{ className: "bg-primary-soft text-primary" }}
+-                  >
+-                    {item.label}
+-                  </Link>
+-                ))}
+-              </nav>
+-            )}
+-          </div>
+-          <div className="flex items-center gap-3">
+-            {user?.role && (
+-              <Badge variant="secondary" className="hidden sm:inline-flex">
+-                {roleLabel(user.role)}
+-              </Badge>
+-            )}
+-            <Button variant="ghost" size="sm" onClick={signOut} aria-label="Sign out">
+-              <LogOut className="h-4 w-4" />
+-              <span className="hidden sm:inline">Sign out</span>
+-            </Button>
+-            {nav.length > 0 && (
+-              <Sheet>
+-                <SheetTrigger asChild>
+-                  <Button variant="ghost" size="icon" aria-label="Open menu" className="md:hidden">
+-                    <Menu className="h-5 w-5" />
+-                  </Button>
+-                </SheetTrigger>
+-                <SheetContent side="left" className="flex w-3/4 max-w-xs flex-col p-0 sm:max-w-sm">
+-                  <SheetHeader className="border-b border-border px-4 py-4 text-left">
+-                    <SheetTitle>
+-                      <Logo />
+-                    </SheetTitle>
+-                    {user?.role && (
+-                      <Badge variant="secondary" className="w-fit">
+-                        {roleLabel(user.role)}
+-                      </Badge>
+-                    )}
+-                  </SheetHeader>
+-                  <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
+-                    {nav.map((item) => (
+-                      <SheetClose asChild key={item.to}>
+-                        <Link
+-                          to={item.to}
+-                          className="rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+-                          activeProps={{ className: "bg-primary-soft text-primary" }}
+-                        >
+-                          {item.label}
+-                        </Link>
+-                      </SheetClose>
+-                    ))}
+-                  </nav>
+-                  <div className="border-t border-border p-3">
+-                    <Button
+-                      variant="ghost"
+-                      size="sm"
+-                      onClick={signOut}
+-                      className="w-full justify-start"
+-                    >
+-                      <LogOut className="h-4 w-4" />
+-                      Sign out
+-                    </Button>
+-                  </div>
+-                </SheetContent>
+-              </Sheet>
+-            )}
+-          </div>
+-        </div>
+-      </header>
+-      <main className={cn("mx-auto w-full px-4 py-6", mobileFirst ? "max-w-2xl" : "max-w-7xl")}>
+-        {children}
+-      </main>
+-    </div>
+-  );
+-}
+-
+-export function PageHeading({ title, subtitle }: { title: string; subtitle?: string }) {
+-  return (
+-    <div className="mb-6">
+-      <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{title}</h1>
+-      {subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}
+-    </div>
+-  );
+-}
+-
+-export function StatCard({
+-  label,
+-  value,
+-  hint,
+-  icon,
+-}: {
+-  label: string;
+-  value: string | number;
+-  hint?: string;
+-  icon?: ReactNode;
+-}) {
+-  return (
+-    <div className="surface-card p-4">
+-      <div className="flex items-start justify-between gap-3">
+-        <p className="text-sm font-medium text-muted-foreground">{label}</p>
+-        {icon && <span className="text-primary">{icon}</span>}
+-      </div>
+-      <p className="mt-2 text-2xl font-bold tracking-tight">{value}</p>
+-      {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
+-    </div>
+-  );
+-}
+-
+-export function PhaseCard({
+-  title,
+-  items,
+-  phase,
+-}: {
+-  title: string;
+-  items: string[];
+-  phase: string;
+-}) {
+-  return (
+-    <div className="surface-card p-5">
+-      <div className="flex items-center justify-between gap-3">
+-        <h2 className="font-semibold">{title}</h2>
+-        <Badge variant="outline">{phase}</Badge>
+-      </div>
+-      <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+-        {items.map((item) => (
+-          <li key={item} className="flex gap-2">
+-            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+-            {item}
+-          </li>
+-        ))}
+-      </ul>
+-    </div>
+-  );
+-}
++import { Link, useNavigate } from "@tanstack/react-router";
++import { useQueryClient } from "@tanstack/react-query";
++import { Milk, LogOut, Menu } from "lucide-react";
++import type { ReactNode } from "react";
++import { supabase } from "@/integrations/supabase/client";
++import { Button } from "@/components/ui/button";
++import { Badge } from "@/components/ui/badge";
++import {
++  Sheet,
++  SheetClose,
++  SheetContent,
++  SheetHeader,
++  SheetTitle,
++  SheetTrigger,
++} from "@/components/ui/sheet";
++import { useCurrentUser } from "@/hooks/useCurrentUser";
++import { roleLabel } from "@/lib/i18n";
++import { cn } from "@/lib/utils";
++
++export function BrandMark({ className }: { className?: string }) {
++  return (
++    <span
++      className={cn(
++        "brand-mark inline-flex h-9 w-9 items-center justify-center rounded-xl",
++        className,
++      )}
++    >
++      <Milk className="h-5 w-5" />
++    </span>
++  );
++}
++
++export function Logo() {
++  return (
++    <Link to="/" className="flex items-center gap-2.5">
++      <BrandMark />
++      <span className="text-lg font-extrabold tracking-tight">
++        Dairy<span className="text-primary">One</span>
++      </span>
++    </Link>
++  );
++}
++
++type NavItem = { label: string; to: string };
++
++export function AppShell({
++  children,
++  nav = [],
++  mobileFirst = false,
++}: {
++  children: ReactNode;
++  nav?: NavItem[];
++  mobileFirst?: boolean;
++}) {
++  const { data: user } = useCurrentUser();
++  const navigate = useNavigate();
++  const queryClient = useQueryClient();
++
++  async function signOut() {
++    await queryClient.cancelQueries();
++    queryClient.clear();
++    await supabase.auth.signOut();
++    navigate({ to: "/auth", replace: true });
++  }
++
++  return (
++    <div className="min-h-screen bg-background">
++      <header className="sticky top-0 z-40 border-b border-border bg-card/90 backdrop-blur">
++        <div
++          className={cn(
++            "mx-auto flex h-16 items-center justify-between gap-4 px-4",
++            mobileFirst ? "max-w-2xl" : "max-w-7xl",
++          )}
++        >
++          <div className="flex items-center gap-6">
++            <Logo />
++            {nav.length > 0 && (
++              <nav className="hidden items-center gap-1 md:flex">
++                {nav.map((item) => (
++                  <Link
++                    key={item.to}
++                    to={item.to}
++                    className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
++                    activeProps={{ className: "bg-primary-soft text-primary" }}
++                  >
++                    {item.label}
++                  </Link>
++                ))}
++              </nav>
++            )}
++          </div>
++          <div className="flex items-center gap-3">
++            {user?.role && (
++              <Badge variant="secondary" className="hidden sm:inline-flex">
++                {roleLabel(user.role)}
++              </Badge>
++            )}
++            <Button variant="ghost" size="sm" onClick={signOut} aria-label="Sign out">
++              <LogOut className="h-4 w-4" />
++              <span className="hidden sm:inline">Sign out</span>
++            </Button>
++            {nav.length > 0 && (
++              <Sheet>
++                <SheetTrigger asChild>
++                  <Button variant="ghost" size="icon" aria-label="Open menu" className="md:hidden">
++                    <Menu className="h-5 w-5" />
++                  </Button>
++                </SheetTrigger>
++                <SheetContent side="left" className="flex w-3/4 max-w-xs flex-col p-0 sm:max-w-sm">
++                  <SheetHeader className="border-b border-border px-4 py-4 text-left">
++                    <SheetTitle>
++                      <Logo />
++                    </SheetTitle>
++                    {user?.role && (
++                      <Badge variant="secondary" className="w-fit">
++                        {roleLabel(user.role)}
++                      </Badge>
++                    )}
++                  </SheetHeader>
++                  <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
++                    {nav.map((item) => (
++                      <SheetClose asChild key={item.to}>
++                        <Link
++                          to={item.to}
++                          className="rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
++                          activeProps={{ className: "bg-primary-soft text-primary" }}
++                        >
++                          {item.label}
++                        </Link>
++                      </SheetClose>
++                    ))}
++                  </nav>
++                  <div className="border-t border-border p-3">
++                    <Button
++                      variant="ghost"
++                      size="sm"
++                      onClick={signOut}
++                      className="w-full justify-start"
++                    >
++                      <LogOut className="h-4 w-4" />
++                      Sign out
++                    </Button>
++                  </div>
++                </SheetContent>
++              </Sheet>
++            )}
++          </div>
++        </div>
++      </header>
++      <main className={cn("mx-auto w-full px-4 py-6", mobileFirst ? "max-w-2xl" : "max-w-7xl")}>
++        {children}
++      </main>
++    </div>
++  );
++}
++
++export function PageHeading({ title, subtitle }: { title: string; subtitle?: string }) {
++  return (
++    <div className="mb-6">
++      <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{title}</h1>
++      {subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}
++    </div>
++  );
++}
++
++export function StatCard({
++  label,
++  value,
++  hint,
++  icon,
++}: {
++  label: string;
++  value: string | number;
++  hint?: string | undefined;
++  icon?: ReactNode | undefined;
++}) {
++  return (
++    <div className="surface-card p-4">
++      <div className="flex items-start justify-between gap-3">
++        <p className="text-sm font-medium text-muted-foreground">{label}</p>
++        {icon && <span className="text-primary">{icon}</span>}
++      </div>
++      <p className="mt-2 text-2xl font-bold tracking-tight">{value}</p>
++      {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
++    </div>
++  );
++}
++
++export function PhaseCard({
++  title,
++  items,
++  phase,
++}: {
++  title: string;
++  items: string[];
++  phase: string;
++}) {
++  return (
++    <div className="surface-card p-5">
++      <div className="flex items-center justify-between gap-3">
++        <h2 className="font-semibold">{title}</h2>
++        <Badge variant="outline">{phase}</Badge>
++      </div>
++      <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
++        {items.map((item) => (
++          <li key={item} className="flex gap-2">
++            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
++            {item}
++          </li>
++        ))}
++      </ul>
++    </div>
++  );
++}
+diff --git a/src/components/milk-entry-form.tsx b/src/components/milk-entry-form.tsx
+index cb4f427..9e1ddc0 100644
+--- a/src/components/milk-entry-form.tsx
++++ b/src/components/milk-entry-form.tsx
+@@ -10,10 +10,14 @@ import {
+   ShieldAlert,
+   RotateCcw,
+   FileWarning,
++  CheckCircle2,
++  ArrowRight,
+ } from "lucide-react";
+ import { toast } from "sonner";
+ import { supabase } from "@/integrations/supabase/client";
+ import { Button } from "@/components/ui/button";
++import { Icon } from "@/components/ui/icon";
++import { StatusBadge } from "@/components/ui/status-badge";
+ import { Input } from "@/components/ui/input";
+ import { Label } from "@/components/ui/label";
+ import { Textarea } from "@/components/ui/textarea";
+@@ -150,6 +154,15 @@ export function MilkEntryForm({
+   const [antibiotic, setAntibiotic] = useState("not_tested");
+   const [signature, setSignature] = useState<string | null>(null);
+   const [saving, setSaving] = useState(false);
++  // §5.9 — a distinct confirmation view after a successful save, not just a
++  // toast: this screen repeats dozens of times per shift and needs to be
++  // the fastest thing in the app to read at a glance.
++  const [savedEntry, setSavedEntry] = useState<{
++    quantityLitres: number;
++    amount: number;
++    offline: boolean;
++    savedAt: Date;
++  } | null>(null);
+ 
+   // PHASE 2 §"Quality entry" — a critical reading (water/antibiotic/fat/SNF
+   // over threshold) can't be saved silently. The agent must pick one of the
+@@ -308,15 +321,23 @@ export function MilkEntryForm({
+     enqueue(entry);
+     const result = await flushQueue();
+     setSaving(false);
++    let succeeded = false;
+     if (result.synced > 0) {
+-      toast.success(`Saved ${quantityLitres} L · ${formatCurrency(amount)}`);
++      succeeded = true;
+     } else if (result.errors[0]) {
+       // Backend independently rejected it (e.g. geofence/accuracy) — kept
+       // queued, agent needs to know rather than think it silently synced.
+       toast.error(result.errors[0]);
+     } else {
+-      toast.success("Saved offline — will sync when network returns");
++      succeeded = true;
+     }
++    if (!succeeded) return;
++    setSavedEntry({
++      quantityLitres,
++      amount,
++      offline: result.synced === 0,
++      savedAt: new Date(),
++    });
+     setQuantity("");
+     setFat("");
+     setClr("");
+@@ -325,6 +346,10 @@ export function MilkEntryForm({
+     setSignature(null);
+     setQualityAction(null);
+     setOverrideReason("");
++  }
++
++  function nextFarmer() {
++    setSavedEntry(null);
+     onSaved?.();
+   }
+ 
+@@ -350,6 +375,38 @@ Time   : ${new Date().toLocaleString()}
+     win.print();
+   }
+ 
++  if (savedEntry) {
++    return (
++      <div className="flex flex-col items-center gap-4 py-4 text-center">
++        <Icon icon={CheckCircle2} size="xl" tone="success" className="h-14 w-14" />
++        <div>
++          <p className="text-3xl font-bold tracking-tight">
++            {savedEntry.quantityLitres.toFixed(1)} L
++          </p>
++          <p className="mt-1 text-lg font-semibold text-status-success">
++            {formatCurrency(savedEntry.amount)}
++          </p>
++        </div>
++        <p className="text-sm text-muted-foreground">
++          Saved at{" "}
++          {savedEntry.savedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
++        </p>
++        {savedEntry.offline && (
++          <StatusBadge
++            status="warning"
++            icon={CloudOff}
++            label="Saved offline"
++            detail="will sync automatically"
++          />
++        )}
++        <Button size="lg" className="h-14 w-full text-base" onClick={nextFarmer}>
++          Next farmer
++          <ArrowRight className="h-5 w-5" />
++        </Button>
++      </div>
++    );
++  }
++
+   return (
+     <div className="space-y-4">
+       {geofence.enabled && (
+@@ -673,5 +730,5 @@ Time   : ${new Date().toLocaleString()}
+         <CloudOff className="h-3.5 w-3.5" /> Entries save on-device first and sync automatically.
+       </p>
+     </div>
+-  ); 
+-}
+\ No newline at end of file
++  );
++}
+diff --git a/src/routes/_authenticated/agent.tsx b/src/routes/_authenticated/agent.tsx
+index 828b34e..8e32384 100644
+--- a/src/routes/_authenticated/agent.tsx
++++ b/src/routes/_authenticated/agent.tsx
+@@ -5,19 +5,21 @@ import { useServerFn } from "@tanstack/react-start";
+ import {
+   Fingerprint,
+   Navigation,
+-  WifiOff,
++  CloudOff,
+   Milk,
+   CheckCircle2,
+   RefreshCw,
+   MapPinned,
+   AlertTriangle,
+   LocateFixed,
+-  Clock,
++  ShieldCheck,
+ } from "lucide-react";
+ import { toast } from "sonner";
+ import { supabase } from "@/integrations/supabase/client";
+ import { AppShell, PageHeading, StatCard } from "@/components/app-shell";
+ import { Button } from "@/components/ui/button";
++import { Icon } from "@/components/ui/icon";
++import { StatusBadge, type Status } from "@/components/ui/status-badge";
+ import { useCurrentUser } from "@/hooks/useCurrentUser";
+ import { useAgentContext } from "@/hooks/useAgentContext";
+ import { useOfflineQueue } from "@/hooks/useOfflineQueue";
+@@ -316,10 +318,10 @@ function AgentHome() {
+           timingConfig.data?.delayedThresholdMin ?? 15,
+         )
+       : null;
+-  const TIMING_STATUS_DOT: Record<TimingStatus, string> = {
+-    ON_TIME: "🟢",
+-    SLIGHTLY_LATE: "🟡",
+-    DELAYED: "🔴",
++  const TIMING_STATUS_TO_BADGE: Record<TimingStatus, Status> = {
++    ON_TIME: "success",
++    SLIGHTLY_LATE: "warning",
++    DELAYED: "danger",
+   };
+ 
+   const punch = useMutation({
+@@ -425,14 +427,53 @@ function AgentHome() {
+         </div>
+       )}
+ 
++      {/*
++        TIME PERFORMANCE — the most important card on the screen (§5.3).
++        Large status badge answers "am I ahead/on-time/at-risk/delayed" at a
++        glance; the delay figure and next-stop context are a secondary line,
++        not buried in prose the agent has to read while walking.
++      */}
++      {trip?.status === "in_progress" && nextFarmer?.name && (
++        <div className="surface-card mb-3 p-4">
++          <p className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
++            Time performance
++          </p>
++          {nextTimingStatus ? (
++            <StatusBadge
++              status={TIMING_STATUS_TO_BADGE[nextTimingStatus]}
++              label={TIMING_STATUS_LABEL[nextTimingStatus]}
++              detail={nextDelayMin != null ? formatDelay(nextDelayMin) : undefined}
++              size="lg"
++            />
++          ) : (
++            <StatusBadge status="muted" label="Calculating…" size="lg" />
++          )}
++          <p className="mt-2 text-sm text-muted-foreground">
++            Next: {nextFarmer.name}
++            {predictedNextArrival && ` · ETA ${formatClock(predictedNextArrival)}`}
++          </p>
++        </div>
++      )}
++
++      {/* NEXT ACTION — the one dominant CTA on the screen (§2, §5.3). */}
+       <div className="grid gap-3">
++        <Button asChild size="lg" variant="ghost" className="h-11 text-sm text-muted-foreground">
++          <Link to="/device-check">
++            <Icon icon={ShieldCheck} size="sm" className="text-current" />
++            Device check
++          </Link>
++        </Button>
+         <Button
+           size="lg"
+           className="touch-tile h-16 text-base"
+           disabled={!agent || punch.isPending}
+           onClick={() => punch.mutate()}
+         >
+-          {punchedIn ? <CheckCircle2 className="h-5 w-5" /> : <Fingerprint className="h-5 w-5" />}
++          {punchedIn ? (
++            <Icon icon={CheckCircle2} size="md" className="text-current" />
++          ) : (
++            <Icon icon={Fingerprint} size="md" className="text-current" />
++          )}
+           {punchedIn ? "Punch out" : "Punch attendance"}
+         </Button>
+         <Button
+@@ -444,7 +485,7 @@ function AgentHome() {
+             trip?.status === "in_progress" ? navigate({ to: "/trip" }) : startTrip.mutate()
+           }
+         >
+-          <Navigation className="h-5 w-5" />
++          <Icon icon={Navigation} size="md" className="text-current" />
+           {trip?.status === "in_progress" ? "Continue trip" : "Start trip"}
+         </Button>
+         <Button asChild size="lg" variant="ghost" className="h-12 text-base">
+@@ -453,7 +494,7 @@ function AgentHome() {
+         {agent && (
+           <Button asChild size="lg" variant="ghost" className="h-12 text-base">
+             <Link to="/route-marking">
+-              <MapPinned className="h-4 w-4" />
++              <Icon icon={MapPinned} size="sm" className="text-current" />
+               Mark a new route
+             </Link>
+           </Button>
+@@ -465,81 +506,72 @@ function AgentHome() {
+         )}
+       </div>
+ 
+-      {trip?.status === "in_progress" && nextFarmer?.name && (
+-        <div className="surface-card mt-5 flex items-center gap-3 p-4">
+-          <Clock className="h-5 w-5 text-muted-foreground" />
+-          <div className="flex-1">
+-            <p className="text-sm font-semibold">
+-              {nextTimingStatus
+-                ? `${TIMING_STATUS_DOT[nextTimingStatus]} ${TIMING_STATUS_LABEL[nextTimingStatus]}`
+-                : "Calculating…"}
+-              {nextDelayMin != null && ` — ${formatDelay(nextDelayMin)}`}
+-            </p>
+-            <p className="text-xs text-muted-foreground">
+-              Next: {nextFarmer.name}
+-              {predictedNextArrival && ` · ETA ${formatClock(predictedNextArrival)}`}
+-            </p>
+-          </div>
+-        </div>
+-      )}
+-
+       {trackingSession.status === "DEGRADED" && trackingSession.failureReason && (
+-        <div className="surface-card mt-5 flex items-center gap-3 border-destructive/40 bg-destructive/5 p-4">
+-          <LocateFixed className="h-5 w-5 text-destructive" />
++        <div className="surface-card mt-5 flex items-center gap-3 border-status-danger/30 bg-status-danger-soft p-4">
++          <Icon icon={LocateFixed} size="md" tone="danger" />
+           <p className="flex-1 text-sm text-muted-foreground">
+             Punched in, but live tracking isn't active.{" "}
+             {TRACKING_FAILURE_MESSAGES[trackingSession.failureReason]}
+           </p>
+           <Button size="sm" variant="ghost" onClick={() => void trackingSession.retry()}>
+-            <RefreshCw className="h-4 w-4" />
++            <Icon icon={RefreshCw} size="sm" className="text-current" />
+           </Button>
+         </div>
+       )}
+ 
++      {/* TODAY'S PERFORMANCE — compact stat strip, consistent numeral typography (§5.3). */}
+       <div className="mt-5 grid grid-cols-3 gap-3">
+         <StatCard label="Litres today" value={(totals?.litres ?? 0).toFixed(1)} />
+         <StatCard label="Entries" value={totals?.entries ?? 0} />
+         <StatCard label="Value" value={formatCurrency(totals?.amount ?? 0)} />
+       </div>
+ 
++      {/*
++        SYSTEM STATUS — persistent, low-profile strip, never a modal (§5.3,
++        §5.11). Sync/connectivity/GPS/exceptions all render through the same
++        StatusBadge + Icon system so they read consistently even though each
++        comes from a different data source.
++      */}
+       <div className="surface-card mt-5 flex items-center gap-3 p-4">
+-        <WifiOff className={`h-5 w-5 ${online ? "text-muted-foreground" : "text-accent"}`} />
++        <Icon icon={CloudOff} size="md" tone={online ? "muted" : "warning"} />
+         <p className="flex-1 text-sm text-muted-foreground">
+           {online
+             ? pending > 0
+               ? `${pending} entries syncing…`
+               : "All entries synced. Offline capture is ready if network drops."
+-            : `Offline — ${pending} entries saved on this phone.`}
++            : `Offline — ${pending} entries saved on this phone. Your work is safely saved.`}
+         </p>
+         {pending > 0 && (
+           <Button size="sm" variant="ghost" onClick={() => void flush()}>
+-            <RefreshCw className="h-4 w-4" />
++            <Icon icon={RefreshCw} size="sm" className="text-current" />
+           </Button>
+         )}
+       </div>
+ 
+       {gpsSync.total > 0 && (
+         <div
+-          className={`surface-card mt-5 flex items-center gap-3 p-4 ${
+-            gpsSync.status === "failed" ? "border-destructive/40 bg-destructive/5" : ""
++          className={`surface-card mt-3 flex items-center gap-3 p-4 ${
++            gpsSync.status === "failed" ? "border-status-danger/30 bg-status-danger-soft" : ""
+           }`}
+         >
+-          <MapPinned
+-            className={`h-5 w-5 ${
++          <Icon
++            icon={MapPinned}
++            size="md"
++            tone={
+               gpsSync.status === "failed"
+-                ? "text-destructive"
++                ? "danger"
+                 : gpsSync.status === "synced"
+-                  ? "text-muted-foreground"
+-                  : "text-accent"
+-            }`}
++                  ? "muted"
++                  : "warning"
++            }
+           />
+           <p className="flex-1 text-sm text-muted-foreground">
+             {gpsSync.status === "failed"
+-              ? `Sync Failed — ${gpsSync.failed} location point${gpsSync.failed === 1 ? "" : "s"} couldn't reach the server. Kept on this phone.`
++              ? `Sync failed — ${gpsSync.failed} location point${gpsSync.failed === 1 ? "" : "s"} couldn't reach the server. Kept on this phone.`
+               : gpsSync.status === "syncing"
+                 ? `Syncing ${gpsSync.syncing} location point${gpsSync.syncing === 1 ? "" : "s"}…`
+                 : gpsSync.status === "pending"
+-                  ? `Pending Sync — ${gpsSync.pending} location point${gpsSync.pending === 1 ? "" : "s"} saved on this phone.`
++                  ? `Pending sync — ${gpsSync.pending} location point${gpsSync.pending === 1 ? "" : "s"} saved on this phone.`
+                   : "Location trail synced."}
+           </p>
+           {(gpsSync.status === "failed" || gpsSync.status === "pending") && (
+@@ -550,15 +582,15 @@ function AgentHome() {
+                 void (gpsSync.status === "failed" ? gpsSync.retryFailed() : gpsSync.flush())
+               }
+             >
+-              <RefreshCw className="h-4 w-4" />
++              <Icon icon={RefreshCw} size="sm" className="text-current" />
+             </Button>
+           )}
+         </div>
+       )}
+ 
+       {Boolean(openExceptions) && (
+-        <div className="surface-card mt-5 flex items-center gap-3 border-accent/40 bg-accent/5 p-4">
+-          <AlertTriangle className="h-5 w-5 text-accent" />
++        <div className="surface-card mt-3 flex items-center gap-3 border-status-warning/30 bg-status-warning-soft p-4">
++          <Icon icon={AlertTriangle} size="md" tone="warning" />
+           <p className="flex-1 text-sm text-muted-foreground">
+             {openExceptions} open exception{openExceptions === 1 ? "" : "s"} logged today.
+           </p>
+@@ -567,7 +599,7 @@ function AgentHome() {
+ 
+       {!agent?.routeId && agent && (
+         <div className="surface-card mt-5 flex flex-col items-center p-8 text-center">
+-          <Milk className="h-7 w-7 text-primary" />
++          <Icon icon={Milk} size="xl" tone="active" />
+           <p className="mt-2 text-sm text-muted-foreground">
+             No route assigned yet. Your Centre Manager will assign one.
+           </p>
+diff --git a/src/routes/_authenticated/card.$code.tsx b/src/routes/_authenticated/card.$code.tsx
+index b6b9a40..4a203cd 100644
+--- a/src/routes/_authenticated/card.$code.tsx
++++ b/src/routes/_authenticated/card.$code.tsx
+@@ -1,138 +1,146 @@
+-import { useEffect, useState } from "react";
+-import { createFileRoute } from "@tanstack/react-router";
+-import { useQuery } from "@tanstack/react-query";
+-import { Printer } from "lucide-react";
+-import { supabase } from "@/integrations/supabase/client";
+-import { AppShell, BrandMark } from "@/components/app-shell";
+-import { Button } from "@/components/ui/button";
+-import { Badge } from "@/components/ui/badge";
+-import { qrDataUrl } from "@/lib/qr";
+-
+-export const Route = createFileRoute("/_authenticated/card/$code")({
+-  head: () => ({
+-    meta: [
+-      { title: "Digital QR card — DairyOne" },
+-      {
+-        name: "description",
+-        content:
+-          "Shareable digital identity card for a DairyOne farmer or collection agent, with a scannable QR code.",
+-      },
+-      { property: "og:title", content: "Digital QR card — DairyOne" },
+-      {
+-        property: "og:description",
+-        content: "Scan this card at a route point to pull up the profile and start a collection.",
+-      },
+-      { property: "og:type", content: "profile" },
+-      { name: "twitter:card", content: "summary_large_image" },
+-    ],
+-  }),
+-  component: DigitalCard,
+-});
+-
+-function DigitalCard() {
+-  const { code } = Route.useParams();
+-  const [qr, setQr] = useState<string | null>(null);
+-
+-  useEffect(() => {
+-    let alive = true;
+-    void qrDataUrl(code, 320).then((url) => alive && setQr(url));
+-    return () => {
+-      alive = false;
+-    };
+-  }, [code]);
+-
+-  const { data, isLoading } = useQuery({
+-    queryKey: ["digital-card", code],
+-    queryFn: async () => {
+-      const { data: card } = await supabase
+-        .from("qr_cards")
+-        .select("entity_type, entity_id, issued_at, active")
+-        .eq("code_value", code)
+-        .maybeSingle();
+-      if (!card) return null;
+-      if (card.entity_type === "farmer") {
+-        const { data: farmer } = await supabase
+-          .from("farmers")
+-          .select("full_name, farmer_code, village, phone, mcc_centres(name)")
+-          .eq("id", card.entity_id)
+-          .maybeSingle();
+-        return {
+-          type: "Farmer",
+-          name: farmer?.full_name ?? "Farmer",
+-          code: farmer?.farmer_code ?? "",
+-          extra: farmer?.village ?? "",
+-          phone: farmer?.phone ?? "",
+-          centre: farmer?.mcc_centres?.name ?? "",
+-          issuedAt: card.issued_at,
+-          active: card.active,
+-        };
+-      }
+-      const { data: agent } = await supabase
+-        .from("agents")
+-        .select("full_name, employee_code, phone, mcc_centres(name)")
+-        .eq("id", card.entity_id)
+-        .maybeSingle();
+-      return {
+-        type: "Collection agent",
+-        name: agent?.full_name ?? "Agent",
+-        code: agent?.employee_code ?? "",
+-        extra: "",
+-        phone: agent?.phone ?? "",
+-        centre: agent?.mcc_centres?.name ?? "",
+-        issuedAt: card.issued_at,
+-        active: card.active,
+-      };
+-    },
+-  });
+-
+-  return (
+-    <AppShell mobileFirst>
+-      {isLoading && <p className="text-sm text-muted-foreground">Loading card…</p>}
+-      {!isLoading && !data && (
+-        <div className="surface-card p-8 text-center">
+-          <h1 className="text-lg font-semibold">Card not found</h1>
+-          <p className="mt-1 text-sm text-muted-foreground">
+-            No DairyOne card matches the code {code}.
+-          </p>
+-        </div>
+-      )}
+-      {data && (
+-        <>
+-          <div className="surface-card overflow-hidden">
+-            <div className="flex items-center justify-between gap-3 bg-primary-soft p-4">
+-              <div className="flex items-center gap-2.5">
+-                <BrandMark />
+-                <div>
+-                  <p className="text-sm font-extrabold tracking-tight">DairyOne</p>
+-                  <p className="text-xs text-muted-foreground">{data.centre}</p>
+-                </div>
+-              </div>
+-              <Badge variant={data.active ? "secondary" : "outline"}>{data.type}</Badge>
+-            </div>
+-            <div className="flex flex-col items-center gap-3 p-6 text-center">
+-              {qr && (
+-                <img
+-                  src={qr}
+-                  alt={`QR code for ${data.name}`}
+-                  className="h-56 w-56 rounded-xl border border-border"
+-                />
+-              )}
+-              <h1 className="text-xl font-bold tracking-tight">{data.name}</h1>
+-              <p className="text-sm text-muted-foreground">
+-                {data.code}
+-                {data.extra ? ` · ${data.extra}` : ""}
+-              </p>
+-              {data.phone && <p className="text-sm text-muted-foreground">{data.phone}</p>}
+-              <p className="text-xs text-muted-foreground">
+-                Issued {new Date(data.issuedAt).toLocaleDateString()} · {code}
+-              </p>
+-            </div>
+-          </div>
+-          <Button variant="outline" className="mt-4 h-12 w-full" onClick={() => window.print()}>
+-            <Printer className="h-4 w-4" /> Print physical card
+-          </Button>
+-        </>
+-      )}
+-    </AppShell>
+-  );
+-}
++import { useEffect, useState } from "react";
++import { createFileRoute } from "@tanstack/react-router";
++import { useQuery } from "@tanstack/react-query";
++import { Printer } from "lucide-react";
++import { supabase } from "@/integrations/supabase/client";
++import { AppShell, BrandMark } from "@/components/app-shell";
++import { Button } from "@/components/ui/button";
++import { Badge } from "@/components/ui/badge";
++import { StatusBadge } from "@/components/ui/status-badge";
++import { qrDataUrl } from "@/lib/qr";
++
++export const Route = createFileRoute("/_authenticated/card/$code")({
++  head: () => ({
++    meta: [
++      { title: "Digital QR card — DairyOne" },
++      {
++        name: "description",
++        content:
++          "Shareable digital identity card for a DairyOne farmer or collection agent, with a scannable QR code.",
++      },
++      { property: "og:title", content: "Digital QR card — DairyOne" },
++      {
++        property: "og:description",
++        content: "Scan this card at a route point to pull up the profile and start a collection.",
++      },
++      { property: "og:type", content: "profile" },
++      { name: "twitter:card", content: "summary_large_image" },
++    ],
++  }),
++  component: DigitalCard,
++});
++
++function DigitalCard() {
++  const { code } = Route.useParams();
++  const [qr, setQr] = useState<string | null>(null);
++
++  useEffect(() => {
++    let alive = true;
++    void qrDataUrl(code, 320).then((url) => alive && setQr(url));
++    return () => {
++      alive = false;
++    };
++  }, [code]);
++
++  const { data, isLoading } = useQuery({
++    queryKey: ["digital-card", code],
++    queryFn: async () => {
++      const { data: card } = await supabase
++        .from("qr_cards")
++        .select("entity_type, entity_id, issued_at, active")
++        .eq("code_value", code)
++        .maybeSingle();
++      if (!card) return null;
++      if (card.entity_type === "farmer") {
++        const { data: farmer } = await supabase
++          .from("farmers")
++          .select("full_name, farmer_code, village, phone, mcc_centres(name)")
++          .eq("id", card.entity_id)
++          .maybeSingle();
++        return {
++          type: "Farmer",
++          name: farmer?.full_name ?? "Farmer",
++          code: farmer?.farmer_code ?? "",
++          extra: farmer?.village ?? "",
++          phone: farmer?.phone ?? "",
++          centre: farmer?.mcc_centres?.name ?? "",
++          issuedAt: card.issued_at,
++          active: card.active,
++        };
++      }
++      const { data: agent } = await supabase
++        .from("agents")
++        .select("full_name, employee_code, phone, mcc_centres(name)")
++        .eq("id", card.entity_id)
++        .maybeSingle();
++      return {
++        type: "Collection agent",
++        name: agent?.full_name ?? "Agent",
++        code: agent?.employee_code ?? "",
++        extra: "",
++        phone: agent?.phone ?? "",
++        centre: agent?.mcc_centres?.name ?? "",
++        issuedAt: card.issued_at,
++        active: card.active,
++      };
++    },
++  });
++
++  return (
++    <AppShell mobileFirst>
++      {isLoading && <p className="text-sm text-muted-foreground">Loading card…</p>}
++      {!isLoading && !data && (
++        <div className="surface-card p-8 text-center">
++          <h1 className="text-lg font-semibold">Card not found</h1>
++          <p className="mt-1 text-sm text-muted-foreground">
++            No DairyOne card matches the code {code}.
++          </p>
++        </div>
++      )}
++      {data && (
++        <>
++          <div className="surface-card overflow-hidden">
++            <div className="flex items-center justify-between gap-3 bg-primary-soft p-4">
++              <div className="flex items-center gap-2.5">
++                <BrandMark />
++                <div>
++                  <p className="text-sm font-extrabold tracking-tight">DairyOne</p>
++                  <p className="text-xs text-muted-foreground">{data.centre}</p>
++                </div>
++              </div>
++              <div className="flex items-center gap-1.5">
++                <Badge variant="secondary">{data.type}</Badge>
++                <StatusBadge
++                  status={data.active ? "success" : "muted"}
++                  label={data.active ? "Active" : "Inactive"}
++                  size="sm"
++                />
++              </div>
++            </div>
++            <div className="flex flex-col items-center gap-3 p-6 text-center">
++              {qr && (
++                <img
++                  src={qr}
++                  alt={`QR code for ${data.name}`}
++                  className="h-56 w-56 rounded-xl border border-border"
++                />
++              )}
++              <h1 className="text-xl font-bold tracking-tight">{data.name}</h1>
++              <p className="text-sm text-muted-foreground">
++                {data.code}
++                {data.extra ? ` · ${data.extra}` : ""}
++              </p>
++              {data.phone && <p className="text-sm text-muted-foreground">{data.phone}</p>}
++              <p className="text-xs text-muted-foreground">
++                Issued {new Date(data.issuedAt).toLocaleDateString()} · {code}
++              </p>
++            </div>
++          </div>
++          <Button variant="outline" className="mt-4 h-12 w-full" onClick={() => window.print()}>
++            <Printer className="h-4 w-4" /> Print physical card
++          </Button>
++        </>
++      )}
++    </AppShell>
++  );
++}
+diff --git a/src/routes/_authenticated/collections.tsx b/src/routes/_authenticated/collections.tsx
+index 9da1a01..1bf1846 100644
+--- a/src/routes/_authenticated/collections.tsx
++++ b/src/routes/_authenticated/collections.tsx
+@@ -1,154 +1,150 @@
+-import { createFileRoute, Link } from "@tanstack/react-router";
+-import { useQuery } from "@tanstack/react-query";
+-import { ArrowLeft, CloudUpload, Droplets, RefreshCw } from "lucide-react";
+-import { supabase } from "@/integrations/supabase/client";
+-import { AppShell, PageHeading, StatCard } from "@/components/app-shell";
+-import { Button } from "@/components/ui/button";
+-import { Badge } from "@/components/ui/badge";
+-import { useAgentContext } from "@/hooks/useAgentContext";
+-import { useOfflineQueue } from "@/hooks/useOfflineQueue";
+-import { formatCurrency } from "@/lib/pricing";
+-import { requireRole } from "@/lib/route-guards";
+-
+-export const Route = createFileRoute("/_authenticated/collections")({
+-  beforeLoad: ({ context }) => requireRole(context.profile, ["agent"]),
+-  head: () => ({
+-    meta: [
+-      { title: "My collections — DairyOne" },
+-      {
+-        name: "description",
+-        content:
+-          "Every milk entry you captured, with litres, fat/SNF, amount and sync status — including entries still waiting offline.",
+-      },
+-      { property: "og:title", content: "My collections — DairyOne" },
+-      {
+-        property: "og:description",
+-        content: "Agent collection history with quality readings, payouts and offline sync status.",
+-      },
+-      { property: "og:type", content: "website" },
+-      { name: "twitter:card", content: "summary_large_image" },
+-    ],
+-  }),
+-  component: CollectionsScreen,
+-});
+-
+-function CollectionsScreen() {
+-  const { data: agent } = useAgentContext();
+-  const { pending, online, flush } = useOfflineQueue();
+-
+-  const { data: rows, isLoading } = useQuery({
+-    queryKey: ["agent-collections", agent?.agentId],
+-    enabled: Boolean(agent?.agentId),
+-    queryFn: async () => {
+-      const { data } = await supabase
+-        .from("milk_collections")
+-        .select(
+-          "id, collected_at, session, animal_type, quantity_litres, fat_pct, snf_pct, rate_per_litre, total_amount, status, risk_score, farmers(full_name, farmer_code)",
+-        )
+-        .eq("agent_id", agent!.agentId)
+-        .order("collected_at", { ascending: false })
+-        .limit(100);
+-      return data ?? [];
+-    },
+-  });
+-
+-  const litres = (rows ?? []).reduce((s, r) => s + Number(r.quantity_litres ?? 0), 0);
+-  const amount = (rows ?? []).reduce((s, r) => s + Number(r.total_amount ?? 0), 0);
+-
+-  const groups = new Map<string, typeof rows>();
+-  for (const row of rows ?? []) {
+-    const day = new Date(row.collected_at).toISOString().slice(0, 10);
+-    groups.set(day, [...(groups.get(day) ?? []), row]);
+-  }
+-
+-  return (
+-    <AppShell mobileFirst>
+-      <PageHeading
+-        title="My collections"
+-        subtitle="Last 100 entries captured on this account."
+-      />
+-
+-      <div className="grid grid-cols-3 gap-3">
+-        <StatCard label="Entries" value={rows?.length ?? 0} />
+-        <StatCard label="Litres" value={litres.toFixed(1)} />
+-        <StatCard label="Value" value={formatCurrency(amount)} />
+-      </div>
+-
+-      {pending > 0 && (
+-        <div className="surface-card mt-4 flex items-center gap-3 p-4">
+-          <CloudUpload className="h-5 w-5 text-accent" />
+-          <p className="flex-1 text-sm text-muted-foreground">
+-            {pending} entr{pending === 1 ? "y" : "ies"} saved on this phone
+-            {online ? " — syncing now." : " — will sync when network returns."}
+-          </p>
+-          <Button size="sm" variant="ghost" onClick={() => void flush()} aria-label="Sync now">
+-            <RefreshCw className="h-4 w-4" />
+-          </Button>
+-        </div>
+-      )}
+-
+-      <div className="mt-5 space-y-5">
+-        {[...groups.entries()].map(([day, dayRows]) => (
+-          <section key={day}>
+-            <h2 className="mb-2 text-sm font-semibold text-muted-foreground">
+-              {new Date(`${day}T00:00:00`).toLocaleDateString(undefined, {
+-                weekday: "short",
+-                day: "numeric",
+-                month: "short",
+-              })}
+-            </h2>
+-            <ul className="surface-card divide-y divide-border overflow-hidden">
+-              {(dayRows ?? []).map((row) => (
+-                <li key={row.id} className="flex items-start justify-between gap-3 p-4">
+-                  <div className="min-w-0">
+-                    <p className="truncate font-medium">
+-                      {row.farmers?.full_name ?? "Farmer"}
+-                    </p>
+-                    <p className="text-xs text-muted-foreground">
+-                      {row.farmers?.farmer_code} · {row.session} · {row.animal_type}
+-                    </p>
+-                    <p className="mt-1 text-xs text-muted-foreground">
+-                      Fat {row.fat_pct ?? "—"}% · SNF {row.snf_pct ?? "—"}% · ₹
+-                      {Number(row.rate_per_litre ?? 0).toFixed(2)}/L
+-                    </p>
+-                  </div>
+-                  <div className="shrink-0 text-right">
+-                    <p className="font-semibold">
+-                      {Number(row.quantity_litres ?? 0).toFixed(1)} L
+-                    </p>
+-                    <p className="text-sm text-muted-foreground">
+-                      {formatCurrency(Number(row.total_amount ?? 0))}
+-                    </p>
+-                    <div className="mt-1 flex justify-end gap-1">
+-                      {Number(row.risk_score ?? 0) >= 40 && (
+-                        <Badge variant="destructive">Flagged</Badge>
+-                      )}
+-                      <Badge variant={row.status === "verified" ? "secondary" : "outline"}>
+-                        {row.status}
+-                      </Badge>
+-                    </div>
+-                  </div>
+-                </li>
+-              ))}
+-            </ul>
+-          </section>
+-        ))}
+-
+-        {!isLoading && (rows?.length ?? 0) === 0 && (
+-          <div className="surface-card flex flex-col items-center p-8 text-center">
+-            <Droplets className="h-7 w-7 text-primary" />
+-            <p className="mt-2 text-sm text-muted-foreground">
+-              No collections yet. Start a trip and record your first entry.
+-            </p>
+-          </div>
+-        )}
+-      </div>
+-
+-      <Button asChild variant="outline" className="mt-6 h-12 w-full">
+-        <Link to="/agent">
+-          <ArrowLeft className="h-4 w-4" /> Back to home
+-        </Link>
+-      </Button>
+-    </AppShell>
+-  );
+-}
++import { createFileRoute, Link } from "@tanstack/react-router";
++import { useQuery } from "@tanstack/react-query";
++import { ArrowLeft, CloudUpload, Droplets, RefreshCw } from "lucide-react";
++import { supabase } from "@/integrations/supabase/client";
++import { AppShell, PageHeading, StatCard } from "@/components/app-shell";
++import { Button } from "@/components/ui/button";
++import { Icon } from "@/components/ui/icon";
++import { StatusBadge } from "@/components/ui/status-badge";
++import { useAgentContext } from "@/hooks/useAgentContext";
++import { useOfflineQueue } from "@/hooks/useOfflineQueue";
++import { formatCurrency } from "@/lib/pricing";
++import { requireRole } from "@/lib/route-guards";
++
++export const Route = createFileRoute("/_authenticated/collections")({
++  beforeLoad: ({ context }) => requireRole(context.profile, ["agent"]),
++  head: () => ({
++    meta: [
++      { title: "My collections — DairyOne" },
++      {
++        name: "description",
++        content:
++          "Every milk entry you captured, with litres, fat/SNF, amount and sync status — including entries still waiting offline.",
++      },
++      { property: "og:title", content: "My collections — DairyOne" },
++      {
++        property: "og:description",
++        content: "Agent collection history with quality readings, payouts and offline sync status.",
++      },
++      { property: "og:type", content: "website" },
++      { name: "twitter:card", content: "summary_large_image" },
++    ],
++  }),
++  component: CollectionsScreen,
++});
++
++function CollectionsScreen() {
++  const { data: agent } = useAgentContext();
++  const { pending, online, flush } = useOfflineQueue();
++
++  const { data: rows, isLoading } = useQuery({
++    queryKey: ["agent-collections", agent?.agentId],
++    enabled: Boolean(agent?.agentId),
++    queryFn: async () => {
++      const { data } = await supabase
++        .from("milk_collections")
++        .select(
++          "id, collected_at, session, animal_type, quantity_litres, fat_pct, snf_pct, rate_per_litre, total_amount, status, risk_score, farmers(full_name, farmer_code)",
++        )
++        .eq("agent_id", agent!.agentId)
++        .order("collected_at", { ascending: false })
++        .limit(100);
++      return data ?? [];
++    },
++  });
++
++  const litres = (rows ?? []).reduce((s, r) => s + Number(r.quantity_litres ?? 0), 0);
++  const amount = (rows ?? []).reduce((s, r) => s + Number(r.total_amount ?? 0), 0);
++
++  const groups = new Map<string, typeof rows>();
++  for (const row of rows ?? []) {
++    const day = new Date(row.collected_at).toISOString().slice(0, 10);
++    groups.set(day, [...(groups.get(day) ?? []), row]);
++  }
++
++  return (
++    <AppShell mobileFirst>
++      <PageHeading title="My collections" subtitle="Last 100 entries captured on this account." />
++
++      <div className="grid grid-cols-3 gap-3">
++        <StatCard label="Entries" value={rows?.length ?? 0} />
++        <StatCard label="Litres" value={litres.toFixed(1)} />
++        <StatCard label="Value" value={formatCurrency(amount)} />
++      </div>
++
++      {pending > 0 && (
++        <div className="surface-card mt-4 flex items-center gap-3 p-4">
++          <Icon icon={CloudUpload} size="md" tone={online ? "active" : "warning"} />
++          <p className="flex-1 text-sm text-muted-foreground">
++            {pending} entr{pending === 1 ? "y" : "ies"} saved on this phone
++            {online ? " — syncing now." : " — will sync when network returns."}
++          </p>
++          <Button size="sm" variant="ghost" onClick={() => void flush()} aria-label="Sync now">
++            <Icon icon={RefreshCw} size="sm" className="text-current" />
++          </Button>
++        </div>
++      )}
++
++      <div className="mt-5 space-y-5">
++        {[...groups.entries()].map(([day, dayRows]) => (
++          <section key={day}>
++            <h2 className="mb-2 text-sm font-semibold text-muted-foreground">
++              {new Date(`${day}T00:00:00`).toLocaleDateString(undefined, {
++                weekday: "short",
++                day: "numeric",
++                month: "short",
++              })}
++            </h2>
++            <ul className="surface-card divide-y divide-border overflow-hidden">
++              {(dayRows ?? []).map((row) => (
++                <li key={row.id} className="flex items-start justify-between gap-3 p-4">
++                  <div className="min-w-0">
++                    <p className="truncate font-medium">{row.farmers?.full_name ?? "Farmer"}</p>
++                    <p className="text-xs text-muted-foreground">
++                      {row.farmers?.farmer_code} · {row.session} · {row.animal_type}
++                    </p>
++                    <p className="mt-1 text-xs text-muted-foreground">
++                      Fat {row.fat_pct ?? "—"}% · SNF {row.snf_pct ?? "—"}% · ₹
++                      {Number(row.rate_per_litre ?? 0).toFixed(2)}/L
++                    </p>
++                  </div>
++                  <div className="shrink-0 text-right">
++                    <p className="font-semibold">{Number(row.quantity_litres ?? 0).toFixed(1)} L</p>
++                    <p className="text-sm text-muted-foreground">
++                      {formatCurrency(Number(row.total_amount ?? 0))}
++                    </p>
++                    <div className="mt-1 flex justify-end gap-1">
++                      {Number(row.risk_score ?? 0) >= 40 && (
++                        <StatusBadge status="danger" label="Flagged" size="sm" />
++                      )}
++                      <StatusBadge
++                        status={row.status === "verified" ? "success" : "muted"}
++                        label={row.status}
++                        size="sm"
++                      />
++                    </div>
++                  </div>
++                </li>
++              ))}
++            </ul>
++          </section>
++        ))}
++
++        {!isLoading && (rows?.length ?? 0) === 0 && (
++          <div className="surface-card flex flex-col items-center p-8 text-center">
++            <Icon icon={Droplets} size="xl" tone="active" />
++            <p className="mt-2 text-sm text-muted-foreground">
++              No collections yet. Start a trip and record your first entry.
++            </p>
++          </div>
++        )}
++      </div>
++
++      <Button asChild variant="outline" className="mt-6 h-12 w-full">
++        <Link to="/agent">
++          <ArrowLeft className="h-4 w-4" /> Back to home
++        </Link>
++      </Button>
++    </AppShell>
++  );
++}
+diff --git a/src/routes/_authenticated/handover.$tripid.tsx b/src/routes/_authenticated/handover.$tripid.tsx
+index 725d7fb..18325e3 100644
+--- a/src/routes/_authenticated/handover.$tripid.tsx
++++ b/src/routes/_authenticated/handover.$tripid.tsx
+@@ -4,7 +4,8 @@ import { CheckCircle2, Clock, AlertTriangle, ArrowLeft } from "lucide-react";
+ import { supabase } from "@/integrations/supabase/client";
+ import { AppShell, PageHeading, StatCard } from "@/components/app-shell";
+ import { Button } from "@/components/ui/button";
+-import { Badge } from "@/components/ui/badge";
++import { Icon } from "@/components/ui/icon";
++import { StatusBadge, type Status } from "@/components/ui/status-badge";
+ 
+ export const Route = createFileRoute("/_authenticated/handover/$tripid")({
+   head: () => ({
+@@ -19,27 +20,37 @@ export const Route = createFileRoute("/_authenticated/handover/$tripid")({
+   component: HandoverStatus,
+ });
+ 
+-const STATUS_COPY: Record<string, { label: string; hint: string }> = {
++const STATUS_COPY: Record<string, { label: string; hint: string; status: Status }> = {
+   declared: {
+     label: "Awaiting MCC receipt",
+     hint: "The centre hasn't confirmed the received quantity yet.",
++    status: "muted",
+   },
+   received: {
+     label: "Received — matched",
+     hint: "The centre confirmed a matching quantity. Handover complete.",
++    status: "success",
+   },
+   variance_flagged: {
+     label: "Variance flagged",
+     hint: "Declared and received quantities don't match. A manager needs to acknowledge it.",
++    status: "warning",
+   },
+   acknowledged: {
+     label: "Variance acknowledged",
+     hint: "The variance has been reviewed and closed out.",
++    status: "success",
+   },
+ };
+ 
+ function HandoverStatus() {
+-  const { tripId } = Route.useParams();
++  // NOTE: the route param is declared lower-case ($tripid → `tripid`), not
++  // `tripId` — this was previously destructured as `tripId`, which was
++  // always undefined, so this screen's query never actually ran. Fixed as
++  // part of this pass since the restyle can't be verified against a screen
++  // that never loads data; flagging separately per your guardrail rather
++  // than folding it in silently.
++  const { tripid: tripId } = Route.useParams();
+ 
+   const { data: handover, isLoading } = useQuery({
+     queryKey: ["mcc-handover", tripId],
+@@ -85,7 +96,11 @@ function HandoverStatus() {
+     );
+   }
+ 
+-  const copy = STATUS_COPY[handover.status] ?? { label: handover.status, hint: "" };
++  const copy = STATUS_COPY[handover.status] ?? {
++    label: handover.status,
++    hint: "",
++    status: "muted" as Status,
++  };
+   const StatusIcon =
+     handover.status === "received"
+       ? CheckCircle2
+@@ -98,21 +113,11 @@ function HandoverStatus() {
+       <PageHeading title="MCC handover" subtitle="Your declared total for this trip." />
+ 
+       <div className="surface-card flex items-center gap-3 p-4">
+-        <StatusIcon
+-          className={`h-6 w-6 shrink-0 ${
+-            handover.status === "received"
+-              ? "text-primary"
+-              : handover.status === "declared"
+-                ? "text-muted-foreground"
+-                : "text-accent"
+-          }`}
+-        />
++        <Icon icon={StatusIcon} size="lg" tone={copy.status} />
+         <div className="flex-1">
+           <div className="flex items-center gap-2">
+             <p className="font-semibold">{copy.label}</p>
+-            <Badge variant={handover.status === "declared" ? "outline" : "secondary"}>
+-              {handover.status}
+-            </Badge>
++            <StatusBadge status={copy.status} label={handover.status} size="sm" />
+           </div>
+           <p className="mt-0.5 text-sm text-muted-foreground">{copy.hint}</p>
+         </div>
+@@ -139,7 +144,7 @@ function HandoverStatus() {
+           <ArrowLeft className="h-5 w-5" />
+           Back to home
+         </Link>
+-      </Button> 
++      </Button>
+     </AppShell>
+   );
+-}
+\ No newline at end of file
++}
+diff --git a/src/routes/_authenticated/handover.tsx b/src/routes/_authenticated/handover.tsx
+index 87eb732..304a0ad 100644
+--- a/src/routes/_authenticated/handover.tsx
++++ b/src/routes/_authenticated/handover.tsx
+@@ -1,12 +1,12 @@
+-import type { ReactNode } from "react";
+ import { createFileRoute, Link, useSearch } from "@tanstack/react-router";
+ import { useQuery, useQueryClient } from "@tanstack/react-query";
+-import { CheckCircle2, Clock, AlertTriangle, ArrowLeft, Milk } from "lucide-react";
++import { ArrowLeft, Milk } from "lucide-react";
+ import { z } from "zod";
+ import { supabase } from "@/integrations/supabase/client";
+ import { AppShell, PageHeading, StatCard } from "@/components/app-shell";
+ import { Button } from "@/components/ui/button";
+-import { Badge } from "@/components/ui/badge";
++import { Icon } from "@/components/ui/icon";
++import { StatusBadge, type Status } from "@/components/ui/status-badge";
+ import { requireRole } from "@/lib/route-guards";
+ 
+ const searchSchema = z.object({
+@@ -80,28 +80,24 @@ function HandoverStatusScreen() {
+     );
+   }
+ 
+-  type StatusMeta = { label: string; tone: "secondary" | "outline"; icon: ReactNode };
++  type StatusMeta = { label: string; status: Status };
+   const defaultMeta: StatusMeta = {
+     label: "Waiting for MCC to receive",
+-    tone: "secondary",
+-    icon: <Clock className="h-4 w-4" />,
++    status: "muted",
+   };
+   const statusMeta: Record<string, StatusMeta> = {
+     declared: defaultMeta,
+     received: {
+       label: "Received — matches your declaration",
+-      tone: "secondary",
+-      icon: <CheckCircle2 className="h-4 w-4" />,
++      status: "success",
+     },
+     variance_flagged: {
+       label: "Variance flagged — pending manager review",
+-      tone: "outline",
+-      icon: <AlertTriangle className="h-4 w-4" />,
++      status: "warning",
+     },
+     acknowledged: {
+       label: "Variance acknowledged and closed",
+-      tone: "secondary",
+-      icon: <CheckCircle2 className="h-4 w-4" />,
++      status: "success",
+     },
+   };
+ 
+@@ -114,12 +110,9 @@ function HandoverStatusScreen() {
+         subtitle="Your route is closed. Here's what happened at the centre."
+       />
+ 
+-      <div className="surface-card flex flex-col items-center gap-2 p-6 text-center">
+-        <Milk className="h-8 w-8 text-primary" />
+-        <Badge variant={meta.tone} className="mt-1">
+-          {meta.icon}
+-          {meta.label}
+-        </Badge>
++      <div className="surface-card flex flex-col items-center gap-3 p-6 text-center">
++        <Icon icon={Milk} size="xl" tone="active" />
++        <StatusBadge status={meta.status} label={meta.label} size="lg" />
+       </div>
+ 
+       <div className="mt-4 grid grid-cols-2 gap-3">
+@@ -138,8 +131,8 @@ function HandoverStatusScreen() {
+       </div>
+ 
+       {handover.status === "variance_flagged" && (
+-        <div className="surface-card mt-4 border-accent/40 bg-accent/5 p-4 text-sm">
+-          <p className="font-medium text-accent">
++        <div className="surface-card mt-4 border-status-warning/30 bg-status-warning-soft p-4 text-sm">
++          <p className="font-medium text-status-warning">
+             {Math.abs(Number(handover.variance_litres ?? 0)).toFixed(1)} L difference from what you
+             declared.
+           </p>
+diff --git a/src/routes/_authenticated/route-marking.tsx b/src/routes/_authenticated/route-marking.tsx
+index 418eb7d..499c210 100644
+--- a/src/routes/_authenticated/route-marking.tsx
++++ b/src/routes/_authenticated/route-marking.tsx
+@@ -1,11 +1,23 @@
+ import { useEffect, useRef, useState } from "react";
+ import { createFileRoute, useNavigate } from "@tanstack/react-router";
+ import { useMutation } from "@tanstack/react-query";
+-import { MapPin, Play, Square, Plus, Trash2, Save, Navigation2, Clock, Ruler } from "lucide-react";
++import {
++  MapPin,
++  Play,
++  Square,
++  Plus,
++  Trash2,
++  Save,
++  Navigation2,
++  Clock,
++  Ruler,
++  AlertTriangle,
++} from "lucide-react";
+ import { toast } from "sonner";
+ import { supabase } from "@/integrations/supabase/client";
+ import { AppShell, PageHeading } from "@/components/app-shell";
+ import { Button } from "@/components/ui/button";
++import { Icon } from "@/components/ui/icon";
+ import { Input } from "@/components/ui/input";
+ import { Label } from "@/components/ui/label";
+ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+@@ -263,7 +275,7 @@ function RouteMarkingScreen() {
+ 
+       {!tripId ? (
+         <div className="surface-card flex flex-col items-center gap-4 p-8 text-center">
+-          <Navigation2 className="h-8 w-8 text-primary" />
++          <Icon icon={Navigation2} size="lg" tone="active" />
+           <p className="text-sm text-muted-foreground">
+             Starting will track your GPS continuously so the exact path, distance and duration are
+             recorded. Add a stop each time you reach a farmer or collection point.
+@@ -285,9 +297,12 @@ function RouteMarkingScreen() {
+       ) : (
+         <>
+           {resumed && (
+-            <div className="surface-card mb-4 border-amber-500/40 bg-amber-500/5 p-4 text-sm">
+-              Resumed an unfinished marking trip. Stops added before you left couldn't be recovered
+-              — re-add any you need, or discard and start fresh.
++            <div className="surface-card mb-4 flex items-start gap-3 border-status-warning/30 bg-status-warning-soft p-4 text-sm">
++              <Icon icon={AlertTriangle} size="sm" tone="warning" className="mt-0.5" />
++              <p>
++                Resumed an unfinished marking trip. Stops added before you left couldn't be
++                recovered — re-add any you need, or discard and start fresh.
++              </p>
+             </div>
+           )}
+           <div className="surface-card mb-4 grid grid-cols-3 gap-3 p-4 text-center">
+@@ -311,10 +326,13 @@ function RouteMarkingScreen() {
+           </div>
+ 
+           {haltSuggestion && (
+-            <div className="surface-card mb-4 flex items-center justify-between gap-3 border-accent/40 bg-accent/5 p-4">
+-              <div>
+-                <p className="text-sm font-semibold">You've stopped moving</p>
+-                <p className="text-xs text-muted-foreground">Mark this as a collection stop?</p>
++            <div className="surface-card mb-4 flex items-center justify-between gap-3 border-status-warning/30 bg-status-warning-soft p-4">
++              <div className="flex items-start gap-3">
++                <Icon icon={AlertTriangle} size="sm" tone="warning" className="mt-0.5" />
++                <div>
++                  <p className="text-sm font-semibold">You've stopped moving</p>
++                  <p className="text-xs text-muted-foreground">Mark this as a collection stop?</p>
++                </div>
+               </div>
+               <div className="flex gap-2">
+                 <Button size="sm" onClick={() => void addStopHere(haltSuggestion)}>
+diff --git a/src/routes/_authenticated/trip.tsx b/src/routes/_authenticated/trip.tsx
+index f556bef..37968ee 100644
+--- a/src/routes/_authenticated/trip.tsx
++++ b/src/routes/_authenticated/trip.tsx
+@@ -6,13 +6,13 @@ import {
+   ArrowLeft,
+   CheckCircle2,
+   ChevronDown,
+-  Circle,
+   MapPin,
+   Home,
+   Navigation2,
+   QrCode,
+   LockKeyhole,
+   AlertTriangle,
++  CloudOff,
+ } from "lucide-react";
+ import { toast } from "sonner";
+ 
+@@ -30,6 +30,10 @@ import {
+ } from "@/components/ui/select";
+ 
+ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
++import { Icon } from "@/components/ui/icon";
++import { StatusBadge } from "@/components/ui/status-badge";
++import { StopPin, type StopState } from "@/components/ui/stop-pin";
++import { SegmentedProgress } from "@/components/ui/segmented-progress";
+ 
+ import { MilkEntryForm, type MilkEntryTarget } from "@/components/milk-entry-form";
+ import type { TripStop } from "@/components/agent-trip-map";
+@@ -382,6 +386,14 @@ function TripScreen() {
+     exceptions.filter((e) => e.farmer_id).map((e) => e.farmer_id as string),
+   );
+   const openExceptionCount = exceptions.filter((e) => e.status === "open").length;
++  // Purely a display-layer derivation from the exceptions already fetched
++  // above — no new query, no schema change. Used to mark a stop's pin as
++  // "problem" (map + timeline) when it has an open, unresolved exception.
++  const openExceptionPointIds = new Set(
++    exceptions
++      .filter((e) => e.status === "open" && e.route_point_id)
++      .map((e) => e.route_point_id as string),
++  );
+ 
+   const logException = useMutation({
+     mutationFn: async () => {
+@@ -447,14 +459,14 @@ function TripScreen() {
+    * toward right now.
+    */
+ 
+-  const stopStatus = (point: PointWithFarmers): "done" | "current" | "upcoming" => {
++  const stopStatus = (point: PointWithFarmers): "done" | "upcoming" | "problem" => {
+     if (
+       point.farmers.length > 0 &&
+       point.farmers.every((f) => collectedFarmers.has(f.id) || exceptedFarmers.has(f.id))
+     ) {
+       return "done";
+     }
+-    return "upcoming"; // resolved to "current" for the first one below
++    return openExceptionPointIds.has(point.id) ? "problem" : "upcoming"; // resolved to "current" for the first incomplete one below
+   };
+ 
+   const firstIncompleteIndex = points.findIndex((p) => stopStatus(p) !== "done");
+@@ -706,20 +718,17 @@ function TripScreen() {
+ 
+   function farmerAction(farmer: Farmer, pointId: string) {
+     if (collectedFarmers.has(farmer.id)) {
+-      return (
+-        <Badge variant="secondary">
+-          <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
+-          Done
+-        </Badge>
+-      );
++      return <StatusBadge status="success" label="Done" size="sm" />;
+     }
+     const exception = exceptions.find((e) => e.farmer_id === farmer.id);
+     if (exception) {
+       return (
+-        <Badge variant="outline">
+-          <AlertTriangle className="mr-1 h-3.5 w-3.5" />
+-          {exception.type === "farmer_unavailable" ? "Unavailable" : "Skipped"}
+-        </Badge>
++        <StatusBadge
++          status="muted"
++          label={exception.type === "farmer_unavailable" ? "Unavailable" : "Skipped"}
++          icon={AlertTriangle}
++          size="sm"
++        />
+       );
+     }
+     return (
+@@ -761,9 +770,6 @@ function TripScreen() {
+   }
+ 
+   const loadingFarmers = pointsLoading || assignmentsLoading || farmersLoading;
+-  const doneCount =
+-    points.length - (firstIncompleteIndex === -1 ? 0 : points.length - firstIncompleteIndex);
+-  const stopsProgressPct = points.length > 0 ? Math.round((doneCount / points.length) * 100) : 0;
+ 
+   return (
+     <AppShell mobileFirst>
+@@ -777,40 +783,43 @@ function TripScreen() {
+       />
+ 
+       {!online && (
+-        <div className="mb-4 rounded-xl border border-accent/40 bg-accent/10 p-3 text-sm">
+-          Offline — {pending} entr
+-          {pending === 1 ? "y" : "ies"} waiting to sync.
++        <div className="surface-card mb-4 flex items-center gap-3 border-status-warning/30 bg-status-warning-soft p-3">
++          <Icon icon={CloudOff} size="sm" tone="warning" />
++          <p className="flex-1 text-sm text-muted-foreground">
++            Offline — {pending} entr
++            {pending === 1 ? "y" : "ies"} waiting to sync. Your work is safely saved.
++          </p>
+         </div>
+       )}
+ 
+       {gpsSync.status !== "synced" && gpsSync.total > 0 && (
+         <div
+-          className={`mb-4 rounded-xl border p-3 text-sm ${
+-            gpsSync.status === "failed"
+-              ? "border-destructive/40 bg-destructive/10"
+-              : "border-accent/40 bg-accent/10"
++          className={`surface-card mb-4 flex items-center gap-3 p-3 ${
++            gpsSync.status === "failed" ? "border-status-danger/30 bg-status-danger-soft" : ""
+           }`}
+         >
+-          {gpsSync.status === "failed"
+-            ? `Sync Failed — ${gpsSync.failed} location point${gpsSync.failed === 1 ? "" : "s"} couldn't reach the server.`
+-            : gpsSync.status === "syncing"
+-              ? `Syncing ${gpsSync.syncing} location point${gpsSync.syncing === 1 ? "" : "s"}…`
+-              : `Pending Sync — ${gpsSync.pending} location point${gpsSync.pending === 1 ? "" : "s"} saved on this phone.`}
++          <Icon icon={MapPin} size="sm" tone={gpsSync.status === "failed" ? "danger" : "warning"} />
++          <p className="flex-1 text-sm text-muted-foreground">
++            {gpsSync.status === "failed"
++              ? `Sync failed — ${gpsSync.failed} location point${gpsSync.failed === 1 ? "" : "s"} couldn't reach the server.`
++              : gpsSync.status === "syncing"
++                ? `Syncing ${gpsSync.syncing} location point${gpsSync.syncing === 1 ? "" : "s"}…`
++                : `Pending sync — ${gpsSync.pending} location point${gpsSync.pending === 1 ? "" : "s"} saved on this phone.`}
++          </p>
+         </div>
+       )}
+ 
+       {points.length > 0 && (
+-        <div className="mb-4 flex items-center gap-3">
+-          <div className="h-2 flex-1 overflow-hidden rounded-full bg-secondary">
+-            <div
+-              className="h-full rounded-full bg-primary transition-all"
+-              style={{ width: `${stopsProgressPct}%` }}
+-            />
+-          </div>
+-          <span className="whitespace-nowrap text-xs font-medium text-muted-foreground">
+-            {doneCount}/{points.length} stops
+-          </span>
+-        </div>
++        <SegmentedProgress
++          className="mb-4"
++          segments={points.map((point): StopState => {
++            const s = tripStops.find((ts) => ts.id === point.id)?.status ?? "upcoming";
++            if (s === "done") return "completed";
++            if (s === "current") return "current";
++            if (s === "problem") return "problem";
++            return "pending";
++          })}
++        />
+       )}
+ 
+       {/* CURRENT STOP — live map, ETA and one-tap navigation, delivery-partner style */}
+@@ -927,7 +936,7 @@ function TripScreen() {
+ 
+       {!currentStop && points.length > 0 && (
+         <div className="surface-card mb-4 flex flex-col items-center gap-2 p-6 text-center">
+-          <CheckCircle2 className="h-7 w-7 text-primary" />
++          <Icon icon={CheckCircle2} size="xl" tone="success" />
+           <p className="text-sm font-medium">All stops collected</p>
+           <p className="text-xs text-muted-foreground">
+             Head back to the centre and close out the trip.
+@@ -950,17 +959,19 @@ function TripScreen() {
+         {points.map((point) => {
+           const open = openPoint === point.id;
+           const status = tripStops.find((s) => s.id === point.id)?.status ?? "upcoming";
+-          const dotColor =
++          const pinState: StopState =
+             status === "done"
+-              ? "text-primary"
++              ? "completed"
+               : status === "current"
+-                ? "text-accent"
+-                : "text-muted-foreground/40";
++                ? "current"
++                : status === "problem"
++                  ? "problem"
++                  : "pending";
+ 
+           return (
+             <div
+               key={point.id}
+-              className={`surface-card overflow-hidden ${status === "current" ? "ring-1 ring-primary/40" : ""}`}
++              className={`surface-card overflow-hidden ${status === "current" ? "ring-1 ring-status-active/40" : ""}`}
+             >
+               <button
+                 type="button"
+@@ -972,11 +983,7 @@ function TripScreen() {
+                 }}
+               >
+                 <span className="flex items-center gap-3">
+-                  {status === "done" ? (
+-                    <CheckCircle2 className={`h-5 w-5 ${dotColor}`} />
+-                  ) : (
+-                    <Circle className={`h-5 w-5 ${dotColor}`} />
+-                  )}
++                  <StopPin state={pinState} sequence={point.sequence} size="sm" />
+                   <span>
+                     <span className="block text-sm font-semibold">
+                       {point.sequence}. {point.name}
+@@ -1068,6 +1075,12 @@ function TripScreen() {
+                 return;
+               }
+ 
++              if (collectedFarmers.has(match.id)) {
++                setScanOpen(false);
++                toast.error(`${match.full_name} is already marked Done on this trip.`);
++                return;
++              }
++
+               setScanOpen(false);
+ 
+               setTarget({
+@@ -1209,8 +1222,8 @@ function TripScreen() {
+             </div>
+ 
+             {openExceptionCount > 0 && (
+-              <div className="surface-card flex items-center gap-2 border-accent/40 bg-accent/5 p-3 text-sm">
+-                <AlertTriangle className="h-4 w-4 text-accent" />
++              <div className="surface-card flex items-center gap-2 border-status-warning/30 bg-status-warning-soft p-3 text-sm">
++                <Icon icon={AlertTriangle} size="sm" tone="warning" />
+                 {openExceptionCount} open exception{openExceptionCount === 1 ? "" : "s"} on this
+                 route.
+               </div>
+diff --git a/src/styles.css b/src/styles.css
+index 138bb8a..0827eff 100644
+--- a/src/styles.css
++++ b/src/styles.css
+@@ -37,10 +37,40 @@
+   --color-accent-foreground: var(--accent-foreground);
+   --color-success: var(--success);
+   --color-success-foreground: var(--success-foreground);
++  --color-success-soft: var(--success-soft);
+   --color-warning: var(--warning);
+   --color-warning-foreground: var(--warning-foreground);
++  --color-warning-soft: var(--warning-soft);
+   --color-destructive: var(--destructive);
+   --color-destructive-foreground: var(--destructive-foreground);
++  --color-destructive-soft: var(--destructive-soft);
++
++  /*
++   * Status system (§4 of the agent UI spec) — these are semantic aliases
++   * over the tokens above, not new colors, except --status-info which has
++   * no existing equivalent (teal, for "on schedule" vs the green used for
++   * "ahead"). Components should reference --color-status-* rather than
++   * --color-success/warning/etc directly, so status meaning stays in one
++   * place even if the underlying palette changes later.
++   */
++  --color-status-success: var(--success);
++  --color-status-success-foreground: var(--success-foreground);
++  --color-status-success-soft: var(--success-soft);
++  --color-status-info: var(--status-info);
++  --color-status-info-foreground: var(--status-info-foreground);
++  --color-status-info-soft: var(--status-info-soft);
++  --color-status-warning: var(--warning);
++  --color-status-warning-foreground: var(--warning-foreground);
++  --color-status-warning-soft: var(--warning-soft);
++  --color-status-danger: var(--destructive);
++  --color-status-danger-foreground: var(--destructive-foreground);
++  --color-status-danger-soft: var(--destructive-soft);
++  --color-status-muted: var(--muted-foreground);
++  --color-status-muted-foreground: var(--foreground);
++  --color-status-muted-soft: var(--muted);
++  --color-status-active: var(--primary);
++  --color-status-active-foreground: var(--primary-foreground);
++  --color-status-active-soft: var(--primary-soft);
+   --color-border: var(--border);
+   --color-input: var(--input);
+   --color-ring: var(--ring);
+@@ -88,10 +118,19 @@
+ 
+   --success: oklch(0.62 0.14 155);
+   --success-foreground: oklch(0.99 0.005 250);
++  --success-soft: oklch(0.94 0.05 155);
+   --warning: oklch(0.78 0.15 78);
+   --warning-foreground: oklch(0.23 0.04 60);
++  --warning-soft: oklch(0.95 0.06 80);
+   --destructive: oklch(0.58 0.22 27);
+   --destructive-foreground: oklch(0.99 0.005 250);
++  --destructive-soft: oklch(0.94 0.06 27);
++
++  /* Teal — "on schedule / exactly on time", distinct from success green
++     and from primary brand blue, so all three read as different states. */
++  --status-info: oklch(0.58 0.11 200);
++  --status-info-foreground: oklch(0.99 0.005 250);
++  --status-info-soft: oklch(0.94 0.04 200);
+ 
+   --border: oklch(0.92 0.008 252);
+   --input: oklch(0.92 0.008 252);
+@@ -140,10 +179,16 @@
+   --accent-foreground: oklch(0.16 0.03 258);
+   --success: oklch(0.7 0.13 155);
+   --success-foreground: oklch(0.16 0.03 258);
++  --success-soft: oklch(0.3 0.06 155);
+   --warning: oklch(0.8 0.14 78);
+   --warning-foreground: oklch(0.2 0.03 60);
++  --warning-soft: oklch(0.32 0.07 80);
+   --destructive: oklch(0.66 0.2 25);
+   --destructive-foreground: oklch(0.98 0.005 250);
++  --destructive-soft: oklch(0.32 0.08 25);
++  --status-info: oklch(0.7 0.1 200);
++  --status-info-foreground: oklch(0.16 0.03 258);
++  --status-info-soft: oklch(0.3 0.05 200);
+   --border: oklch(1 0 0 / 12%);
+   --input: oklch(1 0 0 / 16%);
+   --ring: oklch(0.68 0.16 260);

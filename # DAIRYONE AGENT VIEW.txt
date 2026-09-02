@@ -1,0 +1,2711 @@
+# DAIRYONE AGENT APP V2
+
+## MASTER PRODUCTION UPGRADE PROMPT
+
+You are responsible for upgrading the **existing DairyOne application** into a production-grade, intelligent, real-time **Dairy Collection Agent App**.
+
+This is **NOT a greenfield project**.
+
+The existing DairyOne application already contains functionality, workflows, UI, authentication, database structures, routes, trips, farmer management, collection flows, maps, QR scanning, and potentially offline functionality.
+
+Your job is to **audit, preserve, improve, extend, and integrate** the current system.
+
+---
+
+# 0. NON-NEGOTIABLE RULE — DO NOT REBUILD FROM SCRATCH
+
+Before writing or replacing code:
+
+1. Inspect the entire existing DairyOne codebase relevant to the agent side.
+2. Understand the current architecture.
+3. Identify existing screens, routes, components, hooks, services, APIs, database tables, relationships, authentication, roles, trip logic, route logic, farmer logic, collection logic, QR logic, GPS logic, and offline logic.
+4. Identify what is already working.
+5. Reuse existing functionality wherever practical.
+6. Do not replace working functionality merely for architectural preference.
+7. Do not create duplicate database entities when existing ones can be extended.
+8. Do not break manager/admin functionality.
+9. Keep existing historical data compatible.
+10. Use safe, incremental database migrations.
+11. Preserve existing URLs/routes/navigation wherever practical.
+12. Maintain backward compatibility where required.
+13. Do not silently delete existing functionality.
+14. Do not rebuild the app from zero simply because a cleaner architecture is possible.
+
+First classify existing functionality as:
+
+```text
+KEEP
+IMPROVE
+EXTEND
+REPLACE ONLY IF NECESSARY
+```
+
+The final result must feel like **DairyOne upgraded to V2**, not an unrelated replacement application.
+
+---
+
+# 1. CORE PRODUCT VISION
+
+DairyOne Agent App should become:
+
+> **One intelligent app that tells the agent exactly what to do, tells them whether they are on time, tells them how delayed or early they are, verifies where they are, verifies the correct farmer and collection shift, prevents duplicate collection, records everything automatically, tracks the route in real time, explains operational delays, and continues working reliably when the internet is weak or unavailable.**
+
+The agent should never need to wonder:
+
+> What should I do now?
+
+> Where should I go next?
+
+> What time should I arrive?
+
+> Am I on time?
+
+> How many minutes late am I?
+
+> Why am I late?
+
+> Can I recover the delay?
+
+> Did I already collect this farmer?
+
+> Is this the correct shift?
+
+> What should I do if internet is unavailable?
+
+DairyOne should answer these automatically.
+
+---
+
+# 2. CORE PRINCIPLES
+
+Every screen should answer one or more of these:
+
+### AGENT
+
+**What should I do now?**
+
+### LOCATION
+
+**Where should I go?**
+
+### TIME
+
+**Am I early, on time, at risk, or delayed?**
+
+### OPERATIONS
+
+**Why am I delayed?**
+
+### DATA INTEGRITY
+
+**Can I safely collect this farmer?**
+
+### RELIABILITY
+
+**Will DairyOne preserve my work if internet disappears?**
+
+The app should be operationally intelligent but visually simple.
+
+---
+
+# 3. COMPLETE AGENT JOURNEY
+
+Implement and connect the full journey:
+
+```text
+LOGIN
+  ↓
+FIRST-TIME SETUP
+  ↓
+DEVICE REGISTRATION
+  ↓
+PERMISSIONS & DEVICE CHECK
+  ↓
+AUTO SHIFT DETERMINATION
+  ↓
+PUNCH IN
+  ↓
+AGENT HOME
+  ↓
+TODAY'S TIME STATUS
+  ↓
+START / CONTINUE TRIP
+  ↓
+LIVE GPS TRACKING
+  ↓
+NEXT COLLECTION POINT
+  ↓
+LIVE ETA
+  ↓
+EARLY / ON-TIME / AT-RISK / DELAYED STATUS
+  ↓
+ARRIVAL DETECTION
+  ↓
+LOCATION VERIFICATION
+  ↓
+SELECT / SCAN FARMER
+  ↓
+SHIFT VALIDATION
+  ↓
+DUPLICATE COLLECTION CHECK
+  ↓
+COLLECT MILK
+  ↓
+SAVE COLLECTION
+  ↓
+UPDATE TIMING
+  ↓
+UPDATE ROUTE DELAY / RECOVERY
+  ↓
+NEXT FARMER / NEXT STOP
+  ↓
+COMPLETE ROUTE
+  ↓
+RETURN / FINAL SUMMARY
+  ↓
+PUNCH OUT
+```
+
+Everything must be connected.
+
+---
+
+# 4. COMPLETE AGENT MODULES
+
+The system should contain these core modules:
+
+1. Authentication & Agent Identity
+2. Device Readiness & Permissions
+3. Smart Attendance
+4. Shift Intelligence
+5. Agent Home
+6. Trip & Route Management
+7. Live GPS Tracking
+8. Time & Delay Intelligence
+9. Arrival Verification
+10. Farmer Verification
+11. QR Scanning
+12. Milk Collection
+13. Duplicate Collection Protection
+14. Offline-First Storage
+15. Automatic Sync
+16. Exception Management
+17. Agent History
+18. Profile & Work Status
+19. Real-Time Operational State
+20. Production Monitoring & Hardening
+
+---
+
+# PHASE 1 — EXISTING DAIRYONE AUDIT & SAFE FOUNDATION
+
+Before major implementation, perform a full audit.
+
+## Inspect
+
+### Application
+
+* Existing pages
+* Routes
+* Navigation
+* Components
+* Shared UI
+* State management
+* Hooks
+* Services
+* API calls
+* Error handling
+* Loading states
+
+### Authentication
+
+* Login
+* OTP
+* Session
+* Agent roles
+* Access control
+
+### Agent
+
+* Dashboard
+* Punch In/Out
+* Trips
+* Routes
+* Collection points
+* Farmers
+* QR scanner
+* Collection
+* Existing location tracking
+* Existing offline functionality
+
+### Backend / Database
+
+Identify current:
+
+* Agents
+* Employees
+* Farmers
+* Routes
+* Trips
+* Stops
+* Attendance
+* Collections
+* Locations
+* Exceptions
+* Devices
+* Sessions
+* Sync records
+* Existing shift structures
+
+### Deliverable
+
+Create an internal architecture map:
+
+```text
+CURRENT SCREEN
+    ↓
+CURRENT COMPONENT
+    ↓
+CURRENT SERVICE/API
+    ↓
+CURRENT DATABASE TABLE
+    ↓
+CURRENT BUSINESS RULE
+    ↓
+KEEP / IMPROVE / EXTEND / REPLACE
+```
+
+Do not start by destroying the existing implementation.
+
+---
+
+# PHASE 2 — TIME & SCHEDULE INTELLIGENCE ENGINE
+
+Timing is a **core business requirement** in DairyOne.
+
+Every operational activity must support:
+
+* Planned time
+* Predicted time
+* Actual time
+* Difference
+* Status
+* Delay origin
+* Delay propagation
+* Delay recovery
+
+---
+
+## 2.1 TIME STATES
+
+### 🟢 AHEAD / ON TIME
+
+Example:
+
+```text
+Scheduled: 07:30 AM
+Expected:  07:28 AM
+
+2 minutes ahead
+```
+
+### 🟢 ON SCHEDULE
+
+```text
+Scheduled: 07:30 AM
+Expected:  07:30 AM
+
+On time
+```
+
+### 🟡 AT RISK
+
+```text
+Scheduled: 07:30 AM
+Expected:  07:34 AM
+
+4 minutes behind
+```
+
+### 🔴 DELAYED
+
+```text
+Scheduled: 07:30 AM
+Expected:  07:48 AM
+
+18 minutes behind
+```
+
+The agent should never manually calculate these values.
+
+---
+
+# 2.2 REQUIRED TIMING RECORDS
+
+## Attendance
+
+* Scheduled punch-in
+* Actual punch-in
+* Punch-in delay
+* Scheduled punch-out
+* Actual punch-out
+* Attendance variance
+
+## Trip
+
+* Scheduled trip start
+* Actual trip start
+* Start delay
+* Scheduled completion
+* Predicted completion
+* Actual completion
+
+## Stop
+
+* Scheduled arrival
+* Predicted arrival
+* Actual arrival
+* Arrival delay
+* Planned stop duration
+* Actual stop duration
+* Collection delay
+* Waiting time
+
+## Route
+
+* Planned duration
+* Predicted duration
+* Actual duration
+* Total delay
+* Delay recovered
+* Remaining impact
+
+---
+
+# 2.3 DELAY FORMULAS
+
+Arrival delay:
+
+```text
+Actual Arrival
+-
+Scheduled Arrival
+```
+
+Predicted delay:
+
+```text
+Predicted Arrival
+-
+Scheduled Arrival
+```
+
+Collection delay:
+
+```text
+Actual Collection Duration
+-
+Planned Collection Duration
+```
+
+Route delay:
+
+```text
+Actual / Predicted Completion
+-
+Scheduled Completion
+```
+
+Preserve **predicted** and **actual** values separately.
+
+---
+
+# 2.4 DELAY BREAKDOWN
+
+Never simply say:
+
+> Agent is late.
+
+Determine why.
+
+### TRAVEL DELAY
+
+Potential causes:
+
+* Late trip start
+* Traffic
+* Road blockage
+* Wrong route
+* Vehicle issue
+* Unplanned stop
+* Route deviation
+
+### COLLECTION DELAY
+
+Potential causes:
+
+* More farmers than expected
+* Farmer issue
+* Testing issue
+* Equipment issue
+* Quantity issue
+* Workflow issue
+
+### WAITING DELAY
+
+Track:
+
+```text
+Arrival
+↓
+Collection Start
+```
+
+Example:
+
+```text
+Arrived: 07:30
+Started: 07:42
+
+Waiting: 12 minutes
+```
+
+### ROUTE DELAY
+
+Detect:
+
+* Route deviation
+* Detours
+* Unplanned stationary time
+
+### PREVIOUS STOP DELAY
+
+The system must recognize inherited delay.
+
+Example:
+
+```text
+Stop A
++10 min
+
+Stop B
++8 min
+
+Stop C
++6 min
+```
+
+The system should understand that Stop B may have inherited the delay from Stop A.
+
+---
+
+# 2.5 DELAY PROPAGATION & RECOVERY
+
+Original route:
+
+```text
+07:00 Stop A
+07:30 Stop B
+08:00 Stop C
+08:30 Stop D
+```
+
+After a 15-minute delay:
+
+```text
+07:15 Stop A
+07:45 Stop B
+08:15 Stop C
+08:45 Stop D
+```
+
+After recovering time:
+
+```text
+07:15 Stop A
+07:40 Stop B
+08:05 Stop C
+08:32 Stop D
+```
+
+DairyOne should continuously determine:
+
+> Can the agent recover the delay?
+
+Track:
+
+* Delay created
+* Delay carried
+* Delay increased
+* Delay reduced
+* Delay recovered
+* Remaining route impact
+
+---
+
+# PHASE 3 — SHIFT INTELLIGENCE
+
+Shift determination must be automatic.
+
+The agent should normally **not manually select Morning / Evening**.
+
+---
+
+# 3.1 CONFIGURABLE SHIFTS
+
+Do not hardcode times.
+
+Shift configuration should support:
+
+* Shift ID
+* Shift name
+* Shift code
+* Start time
+* End time
+* Grace period
+* Active/inactive
+* Applicable days
+* Route assignment
+* Collection point assignment
+* Seasonal schedules if required
+
+Example:
+
+```text
+Morning
+05:00 AM – 12:00 PM
+
+Evening
+03:00 PM – 10:00 PM
+```
+
+---
+
+# 3.2 AUTO SHIFT DETERMINATION
+
+Use:
+
+```text
+Current local date
++
+Current local time
++
+Assigned route
++
+Shift rules
+        ↓
+Current Shift
+```
+
+Example:
+
+```text
+07:12 AM
+↓
+MORNING SHIFT
+```
+
+Example:
+
+```text
+05:30 PM
+↓
+EVENING SHIFT
+```
+
+The actual business timezone must come from the DairyOne operational configuration rather than assuming browser/device timezone is always correct.
+
+---
+
+# 3.3 SHIFT STATES
+
+Support:
+
+* Active shift
+* Upcoming shift
+* Grace period
+* Shift ended
+* No active collection shift
+
+Example:
+
+```text
+⚠ MORNING SHIFT ENDING
+
+15 minutes remaining
+```
+
+---
+
+# 3.4 SHIFT-AWARE DATA
+
+Every relevant collection/trip operation must retain its shift.
+
+A collection should logically preserve:
+
+```text
+collection_id
+farmer_id
+agent_id
+trip_id
+route_id
+stop_id
+shift_id
+collection_date / business_date
+collection_timestamp
+milk data
+location
+sync status
+```
+
+Do not recalculate the historical shift later simply from the current clock.
+
+---
+
+# PHASE 4 — SMART ATTENDANCE & DEVICE READINESS
+
+Before the agent starts work:
+
+```text
+GPS Enabled?
+↓
+Precise Location?
+↓
+Background Location?
+↓
+Internet Status?
+↓
+Battery Status?
+↓
+Device Ready?
+↓
+Current Shift?
+↓
+PUNCH IN
+```
+
+---
+
+# 4.1 DEVICE CHECK
+
+Show:
+
+```text
+DAIRYONE DEVICE CHECK
+
+📍 Precise Location
+✓ Enabled
+
+🛰 Background Tracking
+✓ Allowed
+
+🌐 Internet
+✓ Connected
+
+🔋 Battery
+72%
+
+🔔 Notifications
+✓ Enabled
+
+[ READY TO START ]
+```
+
+If something is wrong:
+
+```text
+⚠ Background location is disabled.
+
+DairyOne cannot accurately record
+your collection route.
+
+[ FIX NOW ]
+```
+
+The UI must explain problems clearly.
+
+---
+
+# 4.2 SMART PUNCH IN
+
+Example:
+
+```text
+PUNCH IN
+
+📍 Current location verified
+🕐 06:42 AM
+🔋 Battery 78%
+🌐 Connected
+
+Scheduled: 06:30 AM
+
+🟡 12 minutes late
+
+[ CONFIRM PUNCH IN ]
+```
+
+After confirmation:
+
+> 🟢 You are now ON DUTY
+
+Start:
+
+* Attendance session
+* Tracking session
+* Device monitoring
+* Time monitoring
+
+---
+
+# PHASE 5 — AGENT HOME / COMMAND CENTER
+
+Redesign the existing home rather than replacing it blindly.
+
+---
+
+## Header
+
+```text
+Good Morning, Ramesh 👋
+
+🟢 ON DUTY
+Started 06:42 AM
+
+🌅 MORNING SHIFT
+```
+
+---
+
+## TIME PERFORMANCE CARD
+
+Example on time:
+
+```text
+TIME PERFORMANCE
+
+🟢 ON SCHEDULE
+
+0 min delay
+```
+
+Example delayed:
+
+```text
+TIME PERFORMANCE
+
+🔴 14 MINUTES BEHIND
+
+Delay started:
+Stop 2
+
+Potential recovery:
+6 minutes possible
+```
+
+---
+
+# PRIMARY NEXT ACTION
+
+```text
+NEXT ACTION
+
+Morning Route 1
+
+📍 Point A — Gogelav
+👨‍🌾 3 Farmers waiting
+
+Scheduled: 07:30 AM
+Distance: 0.8 km
+ETA: 3 min
+
+🟢 2 minutes ahead
+
+[ START NAVIGATION ]
+```
+
+Or:
+
+```text
+Scheduled: 07:30 AM
+Current ETA: 07:42 AM
+
+🔴 12 minutes behind schedule
+```
+
+The Next Action engine is one of the most important elements of the app.
+
+---
+
+# TODAY'S PERFORMANCE
+
+Show current-shift data:
+
+```text
+72.8 L
+Collected
+
+12
+Farmers
+
+₹2,970
+Value
+
+8 / 12
+Stops
+
+14 min
+Delay
+```
+
+Do not mix Morning and Evening metrics accidentally.
+
+---
+
+# SYSTEM STATUS
+
+```text
+🟢 GPS Tracking Active
+🟢 All Data Synced
+🔋 Battery: 72%
+```
+
+Offline:
+
+```text
+🟡 OFFLINE
+
+4 items waiting to sync
+
+Your work is safely saved.
+```
+
+---
+
+# PHASE 6 — TRIP & ROUTE EXPERIENCE
+
+When starting a trip:
+
+```text
+MORNING ROUTE 1
+
+━━━━━━━━━━━━
+
+● ● ● ○ ○ ○
+
+2 / 6 Stops
+
+27 Farmers
+428 L Expected
+```
+
+---
+
+# LIVE TRIP STATUS
+
+```text
+🟢 ON TRACK
+
+Route Progress
+
+━━━━━━●━━━━━━○━━━━━━○
+
+3 / 8 Stops
+
+Scheduled Completion:
+11:30 AM
+
+Expected Completion:
+11:42 AM
+
+🔴 12 minutes behind
+```
+
+---
+
+# LIVE MAP
+
+Show:
+
+* Current agent location
+* Planned route
+* Current destination
+* Collection points
+* Completed stops
+* Pending stops
+* Problem stops
+* Route progress
+
+### Stop colors
+
+🟢 Completed
+
+🔵 Current
+
+⚪ Pending
+
+🔴 Problem
+
+---
+
+# STOP TIMELINE
+
+Completed:
+
+```text
+POINT A — GOGELAV
+
+🟢 COMPLETED
+
+Scheduled: 07:30
+Arrived:   07:28
+
+🟢 2 min early
+```
+
+Current:
+
+```text
+POINT B — ANAND
+
+🔵 CURRENT
+
+Scheduled: 08:00
+ETA:       08:05
+
+🟡 Expected +5 min
+```
+
+Upcoming:
+
+```text
+POINT C — KHINVSAR
+
+⚪ UPCOMING
+
+Scheduled: 08:30
+Forecast:  08:34
+
+🟡 Expected +4 min
+```
+
+---
+
+# PHASE 7 — ARRIVAL DETECTION & LOCATION VERIFICATION
+
+Arrival detection should occur when the agent reaches the configured collection-point geofence.
+
+Example:
+
+```text
+📍 ARRIVAL DETECTED
+
+Point A — Gogelav
+
+Distance:
+18 meters
+
+✓ Location verified
+
+[ START COLLECTION ]
+```
+
+Outside radius:
+
+```text
+⚠ LOCATION NOT VERIFIED
+
+You are 420 meters away
+from Point A.
+
+[ NAVIGATE TO POINT ]
+
+[ REPORT EXCEPTION ]
+```
+
+The collection radius must be configurable.
+
+Consider GPS accuracy when evaluating distance.
+
+Possible states:
+
+* Not arrived
+* Arrival detected
+* Verified
+* Poor GPS accuracy
+* Outside radius
+* Exception requested
+* Manager-approved exception
+
+An agent should not normally be able to collect from any arbitrary location.
+
+---
+
+# PHASE 8 — FARMER COLLECTION
+
+At a stop:
+
+```text
+POINT A — GOGELAV
+
+🌅 MORNING SHIFT
+
+3 FARMERS
+
+● Ramesh Patel
+  Pending
+
+● Sita Devi
+  Pending
+
+● Mahesh Solanki
+  Pending
+```
+
+Farmer status must be shift-specific.
+
+---
+
+# PHASE 9 — FARMER VERIFICATION & QR
+
+QR flow:
+
+```text
+SCAN FARMER QR
+
+Point camera at
+DairyOne Farmer Card
+
+[ CAMERA VIEW ]
+```
+
+After scan:
+
+```text
+✓ FARMER VERIFIED
+
+Ramesh Patel
+FRM-001
+
+Current Location:
+Point A — Gogelav
+
+Current Shift:
+🌅 Morning
+
+[ CHECK COLLECTION STATUS ]
+```
+
+Validate:
+
+* QR identity
+* Farmer active/inactive
+* Correct route
+* Correct collection point
+* Current shift
+* Existing collection status
+
+Provide fallback:
+
+* Farmer search
+* Manual farmer selection
+
+QR failure must not unnecessarily block legitimate collection.
+
+---
+
+# PHASE 10 — SINGLE COLLECTION PER FARMER PER SHIFT
+
+This is a **mandatory business rule**.
+
+Core rule:
+
+> **A farmer may be collected again in another legitimate shift, but the same farmer must not be accidentally collected twice within the same configured shift and collection cycle/day.**
+
+Example:
+
+```text
+MORNING SHIFT
+
+Ramesh Patel
+✓ Collected 12.5 L
+07:42 AM
+```
+
+Trying again:
+
+```text
+⚠ ALREADY COLLECTED
+
+Ramesh Patel has already been
+recorded for the Morning Shift.
+
+Collected:
+12.5 L
+
+Time:
+07:42 AM
+
+[ VIEW COLLECTION ]
+```
+
+Do not allow accidental duplicate submission.
+
+---
+
+# 10.1 DUPLICATE CHECK FLOW
+
+When farmer is selected/scanned:
+
+```text
+IDENTIFY FARMER
+      ↓
+DETERMINE CURRENT SHIFT
+      ↓
+CHECK COLLECTION DATE/CYCLE
+      ↓
+CHECK EXISTING COLLECTION
+      ↓
+ALREADY EXISTS?
+   ┌───────┴───────┐
+  YES              NO
+   ↓                ↓
+BLOCK             ALLOW
+```
+
+---
+
+# 10.2 FRONTEND PROTECTION
+
+After valid collection:
+
+* Disable collection button
+* Mark farmer as collected
+* Prevent repeated submission
+* Show actual quantity and time
+
+Example:
+
+```text
+✓ COLLECTED
+
+12.5 L
+07:42 AM
+```
+
+---
+
+# 10.3 LOCAL OFFLINE PROTECTION
+
+Before saving offline:
+
+Check:
+
+```text
+farmer_id
++
+business_date / collection cycle
++
+shift_id
+```
+
+against local collection records.
+
+If already collected:
+
+```text
+🔒 ALREADY COLLECTED
+
+12.5 L
+07:42 AM
+
+Saved on this device
+Awaiting synchronization
+```
+
+Do not create another local collection.
+
+---
+
+# 10.4 BACKEND / DATABASE PROTECTION
+
+Do not rely only on frontend checks.
+
+The backend/database must enforce the business rule.
+
+Use an appropriate uniqueness/idempotency strategy around the actual DairyOne business key, such as:
+
+```text
+farmer
++
+business date / collection cycle
++
+shift
+```
+
+Do not duplicate this mechanism if the existing schema already has an equivalent unique identifier.
+
+The database must remain the final protection against:
+
+* Double tap
+* Multiple requests
+* Retry
+* Race conditions
+* Offline synchronization duplicates
+* Multiple devices
+
+---
+
+# 10.5 SAME FARMER, DIFFERENT SHIFT
+
+A farmer may legitimately be collected again.
+
+Example:
+
+```text
+RAMESH PATEL
+
+🌅 MORNING
+✓ 12.5 L
+07:42 AM
+
+🌆 EVENING
+○ Pending
+```
+
+Do not block Evening simply because Morning exists.
+
+---
+
+# PHASE 11 — COLLECTION SCREEN
+
+Keep it fast.
+
+```text
+← RAMESH PATEL
+
+FRM-001
+
+MILK COLLECTION
+
+Milk Type
+[ Cow ▼ ]
+
+Quantity
+[ 12.5 ] L
+
+Fat
+[ 4.2 ]
+
+SNF
+[ 8.5 ]
+
+Rate
+₹ 42.20 / L
+
+────────────────
+
+TOTAL
+₹527.50
+
+[ SAVE COLLECTION ]
+```
+
+Validate:
+
+* Farmer
+* Shift
+* Location
+* Route/stop
+* Required values
+* Quantity
+* Duplicate status
+* Offline status
+
+After save:
+
+```text
+✓ COLLECTION SAVED
+
+12.5 L
+₹527.50
+
+Collection time:
+07:42 AM
+
+[ NEXT FARMER ]
+```
+
+---
+
+# PHASE 12 — SHIFT-AWARE FARMER LIST
+
+Show:
+
+```text
+POINT A — GOGELAV
+
+MORNING SHIFT
+
+✓ Ramesh Patel
+12.5 L • 07:42
+
+○ Sita Devi
+Pending
+
+○ Mahesh Solanki
+Pending
+```
+
+Do not simply say "Collected" without shift context.
+
+---
+
+# PHASE 13 — SMART NEXT STOP
+
+After completion:
+
+```text
+✓ STOP COMPLETED
+
+4 / 4 Farmers Processed
+
+Completion:
+08:18 AM
+
+Stop impact:
++4 min delay
+
+[ GO TO NEXT STOP ]
+```
+
+Then:
+
+```text
+NEXT STOP
+
+Point B — Anand
+
+1.2 km
+ETA 4 min
+
+4 Farmers
+
+Scheduled: 08:30 AM
+
+🟢 Expected on time
+
+[ NAVIGATE ]
+```
+
+The system should automatically recalculate:
+
+* ETA
+* Expected delay
+* Route completion
+* Remaining delay
+* Recovery potential
+
+---
+
+# PHASE 14 — LIVE GPS TRACKING
+
+The Agent must see:
+
+```text
+🟢 GPS ACTIVE
+
+Last updated:
+Now
+```
+
+When GPS fails:
+
+```text
+🔴 GPS NOT AVAILABLE
+
+Tracking accuracy may be affected.
+
+[ FIX GPS ]
+```
+
+Offline:
+
+```text
+🟡 OFFLINE
+
+Your work is being safely saved
+on this device.
+```
+
+Track appropriate operational fields:
+
+* Latitude
+* Longitude
+* Timestamp
+* Accuracy
+* Speed if available
+* Heading if available
+* Battery state
+* Tracking status
+* Trip association
+* Stop association where appropriate
+
+Avoid excessive location writes that unnecessarily drain battery or overload the backend.
+
+Use sensible tracking intervals based on:
+
+* Movement
+* Active trip
+* Distance
+* Time
+* Accuracy
+* Battery
+* Application lifecycle
+
+---
+
+# PHASE 15 — CAPACITOR AND ANDROID ARCHITECTURE
+
+DairyOne uses Capacitor.
+
+Structure the system approximately as:
+
+```text
+REACT / WEB UI
+       │
+       ▼
+CAPACITOR
+       │
+ ┌─────┼───────────────┐
+ │     │               │
+GPS   CAMERA      NATIVE SERVICES
+ │     │               │
+ └─────┴───────────────┘
+             │
+             ▼
+      LOCAL STORAGE
+             │
+             ▼
+        SYNC ENGINE
+             │
+             ▼
+     EXISTING BACKEND
+```
+
+Use the existing DairyOne stack where suitable.
+
+Do not replace the backend merely for this feature.
+
+---
+
+# NATIVE RESPONSIBILITIES
+
+Handle through appropriate Capacitor/native services:
+
+* Background GPS
+* Camera
+* QR scanning
+* Device information
+* Battery information
+* Network status
+* Android lifecycle
+* Foreground service where required
+* Background tracking
+* Permission state
+
+---
+
+# WEB/APPLICATION RESPONSIBILITIES
+
+Handle:
+
+* Dashboard
+* Navigation
+* Trip workflow
+* Route UI
+* Farmer workflow
+* Collection forms
+* Timing engine
+* Delay UI
+* Local queue management
+* Sync status
+* Agent-facing operational messaging
+
+---
+
+# PHASE 16 — OFFLINE-FIRST ENGINE
+
+Dairy collection often occurs in poor-network areas.
+
+The app must operate safely in:
+
+```text
+Internet ON
+↓
+Normal operation
+
+Internet OFF
+↓
+Local save
+
+GPS / Tracking continues where device capabilities permit
+↓
+Internet returns
+↓
+Automatic sync
+```
+
+Never lose:
+
+* Attendance
+* Trip progress
+* GPS data
+* Collections
+* Photos
+* Exceptions
+* Shift context
+* Timing data
+
+---
+
+# OFFLINE DATA REQUIREMENTS
+
+Offline records must support:
+
+* Local unique ID
+* Server ID when synchronized
+* Created timestamp
+* Updated timestamp
+* Sync status
+* Retry count
+* Last sync attempt
+* Error state
+* Idempotency key
+* Conflict status where applicable
+
+The local database must survive:
+
+* Network loss
+* App backgrounding
+* App restart
+* Temporary backend outage
+
+---
+
+# PHASE 17 — SYNC & CONFLICT HANDLING
+
+When synchronization occurs:
+
+```text
+LOCAL RECORD
+    ↓
+CHECK SERVER
+    ↓
+VALIDATE BUSINESS RULE
+    ↓
+INSERT / UPDATE / REJECT / CONFLICT
+```
+
+Never blindly insert offline records.
+
+For duplicate collection conflict:
+
+```text
+Existing valid collection
+        ↓
+Incoming duplicate
+        ↓
+Do NOT create duplicate
+        ↓
+Mark incoming item as duplicate/conflict
+        ↓
+Preserve audit information
+```
+
+Do not silently delete records.
+
+---
+
+# PHASE 18 — EXCEPTION SYSTEM
+
+Create a proper issue reporting system.
+
+## FARMER ISSUES
+
+* Farmer unavailable
+* Farmer refused
+* Wrong location
+* Duplicate farmer
+* Other
+
+## COLLECTION ISSUES
+
+* Milk rejected
+* Testing problem
+* Quantity issue
+* Equipment issue
+* Other
+
+## ROUTE ISSUES
+
+* Road blocked
+* Vehicle problem
+* Traffic
+* Wrong route
+* Other
+
+## EMERGENCY
+
+* Accident
+* Medical emergency
+* Safety issue
+
+---
+
+# EXCEPTION FLOW
+
+```text
+SELECT ISSUE
+      ↓
+ADD DETAILS
+      ↓
+OPTIONAL PHOTO
+      ↓
+OPTIONAL VOICE NOTE
+      ↓
+GPS AUTOMATICALLY ATTACHED
+      ↓
+TIMING CONTEXT ATTACHED
+      ↓
+SUBMIT
+```
+
+Attach where relevant:
+
+* Agent
+* Trip
+* Route
+* Stop
+* Farmer
+* Shift
+* Timestamp
+* GPS
+* Current delay
+* Delay before issue
+
+Example:
+
+```text
+Road blocked reported at 08:14 AM.
+
+Current route impact:
++12 minutes
+```
+
+---
+
+# PHASE 19 — TIMING + EXCEPTION INTELLIGENCE
+
+Every exception should help explain operations.
+
+Example:
+
+```text
+STOP A
+
+Scheduled arrival: 07:30
+Actual arrival: 07:38
+
+Travel delay: +8 min
+
+Road blockage reported:
+07:34
+
+Exception may explain:
++8 min delay
+```
+
+Do not automatically classify an agent as at fault when an operational exception explains the delay.
+
+---
+
+# PHASE 20 — COLLECTION INTEGRITY & CORRECTION WORKFLOW
+
+Never provide a basic "Delete Collection" operation to the agent.
+
+If a valid collection needs correction:
+
+```text
+COLLECTION EXISTS
+
+12.5 L
+07:42 AM
+
+[ REPORT CORRECTION ]
+```
+
+Possible reasons:
+
+* Wrong farmer
+* Wrong quantity
+* Wrong milk type
+* Testing correction
+* Technical issue
+* Duplicate
+* Other
+
+Corrections should:
+
+* Preserve original data
+* Record reason
+* Record requester
+* Record timestamp
+* Record approval when required
+* Maintain audit trail
+
+Never destroy historical operational data silently.
+
+---
+
+# PHASE 21 — SHIFT-AWARE COMPLETION LOGIC
+
+A stop is not necessarily complete simply because the agent arrived.
+
+Example:
+
+```text
+POINT A — GOGELAV
+
+MORNING SHIFT
+
+✓ Ramesh
+✓ Sita
+✓ Mahesh
+○ Pooja
+```
+
+Status:
+
+```text
+🟡 3 / 4 COMPLETE
+```
+
+After every farmer is either:
+
+* Successfully collected, or
+* Processed through an approved exception workflow
+
+then:
+
+```text
+✓ STOP COMPLETE
+```
+
+An exception must not silently count as a successful milk collection.
+
+---
+
+# PHASE 22 — SHIFT BOUNDARY PROTECTION
+
+Handle boundary conditions correctly.
+
+Example:
+
+```text
+11:59 AM
+→ Morning Shift
+
+12:00 PM
+→ No active shift
+```
+
+Where a grace period exists:
+
+```text
+Morning:
+05:00 AM – 12:00 PM
+
+Grace:
+12:00 PM – 12:15 PM
+```
+
+DairyOne must distinguish:
+
+* Active
+* Grace
+* Ended
+* Upcoming
+* No shift
+
+Do not allow shift manipulation to bypass duplicate protection.
+
+---
+
+# PHASE 23 — MANUAL SHIFT OVERRIDE
+
+Automatic shift detection is the default.
+
+However, authorized override may be supported.
+
+Example:
+
+```text
+Current:
+🌅 Morning
+
+[ REQUEST SHIFT CHANGE ]
+```
+
+If used, capture:
+
+* Requested shift
+* Reason
+* Agent
+* Timestamp
+* Current location
+* Approver
+* Approval status
+
+Do not let agents freely switch shifts simply to collect a farmer twice.
+
+---
+
+# PHASE 24 — SHIFT-AWARE SEARCH
+
+Search result example:
+
+```text
+Ramesh Patel
+FRM-001
+
+TODAY
+
+🌅 Morning
+✓ Collected — 12.5 L
+
+🌆 Evening
+○ Pending
+```
+
+This eliminates ambiguity.
+
+---
+
+# PHASE 25 — SHIFT-AWARE COUNTS
+
+Home/trip screens should show current-shift counts.
+
+Example:
+
+```text
+MORNING SHIFT
+
+12 / 18 Farmers
+Collected
+
+72.8 L
+Collected
+
+6
+Pending
+```
+
+Historical reports may aggregate multiple shifts, but the agent-facing active workflow should remain shift-aware.
+
+---
+
+# PHASE 26 — NEXT ACTION INTELLIGENCE
+
+The Next Action engine should combine:
+
+* Shift
+* Route
+* Current position
+* Current stop
+* Farmer completion
+* ETA
+* Delay
+* Exceptions
+* Route completion
+* Collection status
+
+Example:
+
+```text
+CURRENT SHIFT
+🌅 Morning
+
+NEXT ACTION
+
+Point A — Gogelav
+
+3 Farmers Pending
+12 Farmers Already Collected
+
+[ START NAVIGATION ]
+```
+
+If all farmers are processed:
+
+```text
+✓ STOP COMPLETE
+
+All Morning Shift farmers
+have been processed.
+
+[ GO TO NEXT STOP ]
+```
+
+---
+
+# PHASE 27 — AGENT HISTORY
+
+Bottom navigation:
+
+```text
+Home | Trip | Collect | History | Profile
+```
+
+History should include:
+
+### Today
+
+```text
+Morning Route
+
+✓ Completed
+
+428 L
+27 Farmers
+```
+
+### Previous
+
+```text
+Evening Route
+
+✓ Completed
+
+512 L
+31 Farmers
+```
+
+Trip details:
+
+* Route
+* Stops
+* Collections
+* Distance
+* Start time
+* Completion time
+* Delay
+* Recovery
+* Exceptions
+* Shift
+
+Do not expose manager-only sensitive analytics unless explicitly permitted.
+
+---
+
+# PHASE 28 — PROFILE
+
+Example:
+
+```text
+Ramesh Patel
+
+Collection Agent
+
+Employee ID
+AGT-001
+
+Today's Status
+🟢 On Duty
+
+🌅 Current Shift
+Morning
+
+────────────────
+
+My Profile
+My Attendance
+My Trips
+Help & Support
+Logout
+```
+
+---
+
+# PHASE 29 — BOTTOM NAVIGATION
+
+### 🏠 HOME
+
+Today's command center.
+
+### 🗺 TRIP
+
+Active route and live tracking.
+
+### 🥛 COLLECT
+
+QR scan and farmer collection.
+
+### 📋 HISTORY
+
+Previous trips and collections.
+
+### 👤 PROFILE
+
+Agent details and settings.
+
+During an active trip:
+
+> Trip should become visually prominent.
+
+---
+
+# PHASE 30 — UI/UX REQUIREMENTS
+
+The app must feel:
+
+* Fast
+* Calm
+* Professional
+* Mobile-first
+* Operational
+* One-hand usable
+* Clear under outdoor lighting
+* Low cognitive load
+
+---
+
+# UI RULES
+
+## One Primary Action
+
+The app should usually present one obvious next action:
+
+* Start Navigation
+* Start Collection
+* Save Collection
+* Go to Next Stop
+* Punch In
+* Punch Out
+
+## Avoid
+
+* Too many buttons
+* Technical jargon
+* Excessive text
+* Complicated tables
+* Hidden critical statuses
+* Unnecessary confirmations
+
+## Use
+
+* Strong status indicators
+* Timing badges
+* Progress indicators
+* Clear cards
+* Skeleton loading
+* Empty states
+* Offline states
+* Friendly errors
+* Smooth transitions
+
+---
+
+# PHASE 31 — LIVE AGENT STATUS
+
+The agent should always understand tracking state without feeling watched.
+
+### Normal
+
+```text
+🟢 GPS ACTIVE
+Last updated: Now
+```
+
+### GPS issue
+
+```text
+🔴 GPS NOT AVAILABLE
+
+Tracking accuracy may be affected.
+
+[ FIX GPS ]
+```
+
+### Offline
+
+```text
+🟡 OFFLINE
+
+Your work is being safely saved
+on this device.
+```
+
+---
+
+# PHASE 32 — BATTERY & BACKGROUND TRACKING
+
+Because this is a Capacitor Android app:
+
+Account for:
+
+* Background execution
+* Foreground services where appropriate
+* Android permission lifecycle
+* Battery optimization
+* GPS frequency
+* Movement-based tracking
+* App restart
+* Device reboot considerations if required operationally
+* Network transitions
+
+Do not aggressively track every second.
+
+Optimize for the balance between:
+
+> Operational accuracy + battery life + backend efficiency.
+
+---
+
+# PHASE 33 — SECURITY
+
+Protect:
+
+* Agent session
+* Device identity
+* Collection submissions
+* Shift integrity
+* Location data
+* Offline data
+* QR data
+* API access
+
+Support:
+
+* Authenticated requests
+* Secure sessions
+* Role-based access
+* Device association
+* Session invalidation
+* Duplicate request protection
+* Idempotent operations
+
+An agent must not be able to manipulate:
+
+* Shift
+* Collection history
+* GPS records
+* Attendance
+* Route assignment
+
+through client-side changes alone.
+
+All critical business rules must be enforced server-side where appropriate.
+
+---
+
+# PHASE 34 — MANAGER / ADMIN COMPATIBILITY
+
+Do not break the manager side.
+
+The new agent data should make future manager functionality possible, including:
+
+* Live agent map
+* Current shift
+* Current stop
+* ETA
+* Delay
+* Delay reason
+* Route progress
+* Collection status
+* Offline state
+* Battery
+* Last location
+* Route completion
+* Exceptions
+
+The Agent App should produce clean operational data for future manager dashboards.
+
+---
+
+# PHASE 35 — AUDITABILITY
+
+Operationally important actions should be auditable.
+
+Capture where appropriate:
+
+* Who
+* What
+* When
+* Where
+* Shift
+* Device
+* Old value
+* New value
+* Reason
+* Approval
+
+Especially for:
+
+* Corrections
+* Exceptions
+* Shift overrides
+* Duplicate/conflict events
+* Attendance changes
+* Collection changes
+
+---
+
+# PHASE 36 — FINAL DEVELOPMENT PHASE ORDER
+
+Build strictly in this sequence.
+
+## PHASE 1
+
+Existing App Audit & Foundation
+
+## PHASE 2
+
+Time & Schedule Intelligence
+
+## PHASE 3
+
+Shift Intelligence
+
+## PHASE 4
+
+Device Readiness + Smart Punch In/Out
+
+## PHASE 5
+
+Agent Home Redesign
+
+## PHASE 6
+
+Trip + Route Experience
+
+## PHASE 7
+
+Arrival Detection + Geofencing
+
+## PHASE 8
+
+Farmer Verification + QR
+
+## PHASE 9
+
+Milk Collection
+
+## PHASE 10
+
+Shift-Aware Duplicate Collection Prevention
+
+## PHASE 11
+
+Live GPS + Background Tracking
+
+## PHASE 12
+
+Offline-First Storage
+
+## PHASE 13
+
+Sync + Conflict Resolution
+
+## PHASE 14
+
+Exceptions
+
+## PHASE 15
+
+Delay Reason Intelligence
+
+## PHASE 16
+
+Shift-Aware Completion + Next Action
+
+## PHASE 17
+
+History + Profile
+
+## PHASE 18
+
+Security + Auditability
+
+## PHASE 19
+
+Manager/Admin compatibility
+
+## PHASE 20
+
+Final UI/UX polish and production hardening
+
+---
+
+# PHASE COMPLETION RULE
+
+Do not randomly jump between phases.
+
+For each phase:
+
+```text
+AUDIT
+↓
+DESIGN
+↓
+IMPLEMENT
+↓
+INTEGRATE
+↓
+TEST
+↓
+VERIFY EXISTING FUNCTIONALITY
+↓
+ONLY THEN MOVE TO NEXT PHASE
+```
+
+Do not compromise existing working functionality while adding new functionality.
+
+---
+
+# PHASE 37 — TESTING REQUIREMENTS
+
+Test every critical workflow under:
+
+### Network
+
+* Excellent internet
+* Slow internet
+* Intermittent internet
+* Completely offline
+* Reconnection
+
+### GPS
+
+* Precise
+* Weak accuracy
+* Disabled
+* Permission revoked
+* Background permission revoked
+* Location jump
+* Outside geofence
+
+### Device
+
+* Low battery
+* Battery optimization enabled
+* App backgrounded
+* App killed/restarted
+* Screen locked
+* Android lifecycle transitions
+
+### Collection
+
+* Normal collection
+* Double tap
+* Repeated QR scan
+* Offline duplicate
+* Sync duplicate
+* Two-device conflict
+* Same farmer different shift
+* Same farmer same shift
+* Incorrect route
+* Incorrect location
+
+### Timing
+
+* Early arrival
+* Exactly on time
+* Small delay
+* Large delay
+* Delay propagation
+* Delay recovery
+* Previous-stop delay
+* Collection delay
+* Waiting delay
+
+### Shift
+
+* Shift start
+* Shift end
+* Grace period
+* Between shifts
+* Automatic shift detection
+* Manual override
+* Shift transition during app session
+* Midnight/date boundary where applicable
+
+### Route
+
+* Stop completed
+* Farmer incomplete
+* Farmer exception
+* Route deviation
+* Route completion
+* Next stop recalculation
+
+---
+
+# PHASE 38 — FINAL DATA INTEGRITY RULES
+
+The system must guarantee:
+
+### Farmer Collection
+
+```text
+Same Farmer
++
+Same Business Date / Collection Cycle
++
+Same Shift
+=
+Normally ONE valid collection
+```
+
+### Different Shift
+
+```text
+Same Farmer
++
+Same Date
++
+Different Shift
+=
+Collection may be valid
+```
+
+### Duplicate Attempts
+
+Must be:
+
+* Blocked
+* Logged where appropriate
+* Safe under retries
+* Safe offline
+* Safe during synchronization
+* Safe under concurrent requests
+
+---
+
+# PHASE 39 — FINAL AGENT EXPERIENCE
+
+When the agent opens DairyOne:
+
+```text
+GOOD MORNING, RAMESH 👋
+
+🟢 ON DUTY
+🌅 MORNING SHIFT
+
+TIME PERFORMANCE
+🟢 2 min ahead
+
+NEXT ACTION
+Point A — Gogelav
+
+3 Farmers Pending
+ETA 07:28 AM
+
+🟢 2 min ahead
+
+[ START NAVIGATION ]
+```
+
+On arrival:
+
+```text
+📍 ARRIVAL VERIFIED
+
+Point A — Gogelav
+
+✓ Morning Shift
+
+[ START COLLECTION ]
+```
+
+When farmer is scanned:
+
+```text
+✓ RAMESH PATEL
+
+Morning Shift
+
+○ Collection Pending
+
+[ START COLLECTION ]
+```
+
+After collection:
+
+```text
+✓ COLLECTION SAVED
+
+12.5 L
+07:42 AM
+
+[ NEXT FARMER ]
+```
+
+If scanned again:
+
+```text
+🔒 ALREADY COLLECTED
+
+Morning Shift
+
+12.5 L
+07:42 AM
+
+[ VIEW RECORD ]
+```
+
+After stop:
+
+```text
+✓ STOP COMPLETED
+
+4 / 4 Farmers
+
+Stop delay:
++4 min
+
+Route delay:
++6 min
+
+Potential recovery:
+3 min
+
+[ GO TO NEXT STOP ]
+```
+
+---
+
+# FINAL PRODUCT DEFINITION
+
+The upgraded DairyOne Agent App must NOT simply be:
+
+* A milk collection form
+* A GPS tracker
+* An attendance app
+* A route app
+* A QR scanner
+
+It must intelligently combine:
+
+```text
+AGENT IDENTITY
++
+DEVICE SECURITY
++
+ATTENDANCE
++
+SHIFT INTELLIGENCE
++
+TRIP MANAGEMENT
++
+ROUTE MANAGEMENT
++
+LIVE GPS
++
+ETA
++
+TIME PERFORMANCE
++
+DELAY INTELLIGENCE
++
+DELAY PROPAGATION
++
+DELAY RECOVERY
++
+ARRIVAL VERIFICATION
++
+GEOFENCING
++
+FARMER VERIFICATION
++
+QR
++
+MILK COLLECTION
++
+SHIFT-AWARE DUPLICATE PROTECTION
++
+OFFLINE-FIRST OPERATION
++
+AUTOMATIC SYNC
++
+CONFLICT PROTECTION
++
+EXCEPTION MANAGEMENT
++
+AUDITABILITY
++
+HISTORY
+```
+
+---
+
+# FINAL NON-NEGOTIABLE BUSINESS RULES
+
+1. **Do not rebuild DairyOne from scratch.**
+2. Audit the existing system before modifying it.
+3. Preserve working functionality.
+4. Timing must be a core operational feature.
+5. Every important event needs planned, predicted, and actual timing where relevant.
+6. The agent must always know whether they are early, on time, at risk, or delayed.
+7. The system should identify delay origin and track delay propagation and recovery.
+8. Shift determination must normally happen automatically.
+9. Shift times must be configurable.
+10. Every collection must preserve its shift context.
+11. The same farmer must not normally be collected twice in the same shift and collection cycle.
+12. Duplicate prevention must exist in the UI, local database, sync layer, and backend/database.
+13. A farmer may legitimately be collected again in another shift.
+14. Offline operation must be first-class.
+15. Sync must be idempotent and conflict-safe.
+16. Location verification must be enforced for normal collection.
+17. QR verification must be shift-aware.
+18. Exceptions must capture operational and timing context.
+19. Corrections must be auditable.
+20. Agents should receive guidance, not punitive messaging.
+21. Critical business rules must not rely only on frontend code.
+22. Capacitor Android behavior, background GPS, permissions, battery, and lifecycle must be treated as production concerns.
+23. Existing manager/admin workflows must remain compatible.
+24. Every phase must be tested before progressing.
+
+---
+
+# START NOW
+
+Start with **PHASE 1 ONLY**.
+
+Do not immediately redesign the entire application.
+
+First inspect and understand the existing DairyOne codebase and produce:
+
+```text
+1. Existing Agent Architecture
+2. Existing Screens
+3. Existing Routes
+4. Existing Components
+5. Existing Database Tables
+6. Existing Relationships
+7. Existing Authentication
+8. Existing Trip/Route Logic
+9. Existing Farmer/Collection Logic
+10. Existing QR Logic
+11. Existing GPS Logic
+12. Existing Offline Logic
+13. Existing Shift Logic, if any
+14. Existing Attendance Logic
+15. KEEP / IMPROVE / EXTEND / REPLACE MATRIX
+16. Safe Migration Strategy
+17. Phase-by-Phase Implementation Map
+```
+
+Only after the current DairyOne implementation is properly understood should implementation begin.
+
+The ultimate objective is to transform the **existing DairyOne Agent App into a reliable, intelligent, timing-aware, shift-aware, duplicate-safe, offline-first dairy collection system** without unnecessarily rebuilding what already exists.
