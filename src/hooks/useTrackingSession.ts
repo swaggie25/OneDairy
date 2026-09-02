@@ -115,6 +115,25 @@ export function useTrackingSession() {
     });
   }
 
+  /**
+   * Reclaim any session left NOT_STARTED/ACTIVE/DEGRADED from a previous
+   * Punch In that never reached Punch Out (app killed, crash, browser
+   * closed mid-shift, etc). `tracking_sessions_one_active_per_agent`
+   * allows only one non-terminal row per agent at a time — without this,
+   * a single abandoned session permanently blocks every future Punch In
+   * for that agent with a misleading "backend_failure" banner, since the
+   * real cause (a duplicate-key error from the old row) never surfaces.
+   * Best-effort: if this fails (e.g. offline), the insert below will
+   * simply fail too and report normally via the existing catch block.
+   */
+  async function closeStaleSessions(agentId: string) {
+    await supabase
+      .from("tracking_sessions")
+      .update({ status: "COMPLETED", end_at: new Date().toISOString() })
+      .eq("agent_id", agentId)
+      .in("status", ["NOT_STARTED", "ACTIVE", "DEGRADED"]);
+  }
+
   /** Call right after a successful Punch In (attendance insert). */
   async function initSession(params: InitParams): Promise<TrackingSessionResult> {
     setStatus(null);
@@ -122,6 +141,7 @@ export function useTrackingSession() {
 
     let id: string | null = null;
     try {
+      await closeStaleSessions(params.agentId);
       const { data, error } = await supabase
         .from("tracking_sessions")
         .insert({
