@@ -1,0 +1,172 @@
+diff --git a/package.json b/package.json
+index 69dcf42..db0ac26 100644
+--- a/package.json
++++ b/package.json
+@@ -17,6 +17,7 @@
+     "@capacitor/app": "^8.1.1",
+     "@capacitor/core": "^8.5.1",
+     "@capacitor/device": "^8.0.3",
++    "@capacitor/geolocation": "^8.2.2",
+     "@capacitor/status-bar": "^8.0.3",
+     "@hookform/resolvers": "^5.2.2",
+     "@radix-ui/react-accordion": "^1.2.12",
+diff --git a/src/lib/device-readiness.ts b/src/lib/device-readiness.ts
+index fc959cf..e95a221 100644
+--- a/src/lib/device-readiness.ts
++++ b/src/lib/device-readiness.ts
+@@ -1,5 +1,6 @@
+ import { Capacitor } from "@capacitor/core";
+ import { Device } from "@capacitor/device";
++import { Geolocation } from "@capacitor/geolocation";
+ import { getBatteryLevel } from "@/lib/tracking-quality";
+ 
+ /**
+@@ -38,6 +39,32 @@ async function checkLocationPermission(): Promise<{
+   detail: string;
+   explanation?: string;
+ }> {
++  // Native: `navigator.permissions.query` inside the WebView doesn't
++  // reliably reflect the real Android runtime permission, and there's no
++  // web equivalent of a system permission dialog to fall back on anyway —
++  // ask the @capacitor/geolocation plugin directly, same plugin "Fix now"
++  // uses below to actually trigger that dialog.
++  if (Capacitor.isNativePlatform()) {
++    try {
++      const status = await Geolocation.checkPermissions();
++      if (status.location === "granted") return { level: "success", detail: "Allowed" };
++      if (status.location === "denied")
++        return {
++          level: "danger",
++          detail: "Blocked",
++          explanation:
++            "Location is blocked for DairyOne. Trips can't be tracked or verified until you allow it in your phone's app settings.",
++        };
++      return {
++        level: "warning",
++        detail: "Not yet granted",
++        explanation: "Tap \"Fix now\" to allow location for DairyOne.",
++      };
++    } catch {
++      return { level: "muted", detail: "Couldn't check" };
++    }
++  }
++
+   if (typeof navigator === "undefined" || !navigator.geolocation) {
+     return {
+       level: "danger",
+@@ -203,6 +230,21 @@ export async function runReadinessChecks(): Promise<ReadinessCheck[]> {
+ }
+ 
+ export async function requestLocationPermission(): Promise<void> {
++  if (Capacitor.isNativePlatform()) {
++    // This is the actual fix: @capacitor/geolocation's requestPermissions()
++    // calls Android's ActivityCompat.requestPermissions() under the hood,
++    // which is what shows the system "Allow DairyOne to access this
++    // device's location?" dialog. Plain navigator.geolocation calls (what
++    // this used to do) have no way to trigger that dialog on native — they
++    // just fail silently if the OS permission isn't already granted.
++    try {
++      await Geolocation.requestPermissions();
++    } catch {
++      // Ignored — runReadinessChecks() right after this will reflect
++      // whatever the actual resulting permission state is.
++    }
++    return;
++  }
+   if (typeof navigator === "undefined" || !navigator.geolocation) return;
+   await new Promise<void>((resolve) => {
+     navigator.geolocation.getCurrentPosition(
+diff --git a/src/lib/geo.ts b/src/lib/geo.ts
+index 4638a3a..e13f75e 100644
+--- a/src/lib/geo.ts
++++ b/src/lib/geo.ts
+@@ -1,9 +1,55 @@
++import { Capacitor } from "@capacitor/core";
++import { Geolocation } from "@capacitor/geolocation";
++
+ /** Browser geolocation helper with a safe timeout and no throwing. */
+ export type Coords = { lat: number | null; lng: number | null; accuracy: number | null };
+ 
+ export const NO_COORDS: Coords = { lat: null, lng: null, accuracy: null };
+ 
+-export function getCoords(timeoutMs = 8000): Promise<Coords> {
++/**
++ * On native (Capacitor Android/iOS), `navigator.geolocation` is backed by
++ * the WebView's Chromium geolocation implementation, which silently fails
++ * — no prompt, no error surfaced — unless the app already holds the OS-level
++ * ACCESS_FINE_LOCATION/ACCESS_COARSE_LOCATION runtime permission. Declaring
++ * the permission in AndroidManifest.xml is not enough on Android 6+; some
++ * native code has to actually call `requestPermissions`, which is exactly
++ * what the @capacitor/geolocation plugin does under the hood. This is why
++ * "Fix now" on the device-check screen used to do nothing on native: it
++ * called plain `navigator.geolocation.getCurrentPosition`, which has no way
++ * to trigger that system dialog. Routing native calls through this plugin
++ * instead fixes that — the web path is untouched.
++ */
++async function ensureNativePermission(): Promise<boolean> {
++  try {
++    const current = await Geolocation.checkPermissions();
++    if (current.location === "granted" || current.coarseLocation === "granted") return true;
++    const requested = await Geolocation.requestPermissions();
++    return requested.location === "granted" || requested.coarseLocation === "granted";
++  } catch {
++    return false;
++  }
++}
++
++export async function getCoords(timeoutMs = 8000): Promise<Coords> {
++  if (Capacitor.isNativePlatform()) {
++    const granted = await ensureNativePermission();
++    if (!granted) return NO_COORDS;
++    try {
++      const p = await Geolocation.getCurrentPosition({
++        enableHighAccuracy: true,
++        timeout: timeoutMs,
++        maximumAge: 15_000,
++      });
++      return {
++        lat: p.coords.latitude,
++        lng: p.coords.longitude,
++        accuracy: p.coords.accuracy ?? null,
++      };
++    } catch {
++      return NO_COORDS;
++    }
++  }
++
+   if (typeof navigator === "undefined" || !navigator.geolocation) {
+     return Promise.resolve(NO_COORDS);
+   }
+@@ -89,6 +135,32 @@ export function distanceToPathMeters(
+ }
+ 
+ export function watchCoords(onUpdate: (c: Coords) => void): () => void {
++  if (Capacitor.isNativePlatform()) {
++    let cancelled = false;
++    let watchId: string | null = null;
++    void ensureNativePermission().then((granted) => {
++      if (cancelled || !granted) return;
++      void Geolocation.watchPosition(
++        { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 },
++        (p) => {
++          if (!p) return;
++          onUpdate({
++            lat: p.coords.latitude,
++            lng: p.coords.longitude,
++            accuracy: p.coords.accuracy ?? null,
++          });
++        },
++      ).then((id) => {
++        if (cancelled) void Geolocation.clearWatch({ id });
++        else watchId = id;
++      });
++    });
++    return () => {
++      cancelled = true;
++      if (watchId) void Geolocation.clearWatch({ id: watchId });
++    };
++  }
++
+   if (typeof navigator === "undefined" || !navigator.geolocation) {
+     return () => {};
+   }

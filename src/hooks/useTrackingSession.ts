@@ -184,7 +184,7 @@ export function useTrackingSession() {
     await supabase
       .from("tracking_sessions")
       .update({
-        status: "COMPLETED",
+        status: "COMPLETED",  
         end_at: new Date().toISOString(),
         end_lat: coords.lat,
         end_lng: coords.lng,

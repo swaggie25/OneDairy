@@ -1,5 +1,6 @@
 import { Capacitor } from "@capacitor/core";
 import { Device } from "@capacitor/device";
+import { Geolocation } from "@capacitor/geolocation";
 import { getBatteryLevel } from "@/lib/tracking-quality";
 
 /**
@@ -38,6 +39,32 @@ async function checkLocationPermission(): Promise<{
   detail: string;
   explanation?: string;
 }> {
+  // Native: `navigator.permissions.query` inside the WebView doesn't
+  // reliably reflect the real Android runtime permission, and there's no
+  // web equivalent of a system permission dialog to fall back on anyway —
+  // ask the @capacitor/geolocation plugin directly, same plugin "Fix now"
+  // uses below to actually trigger that dialog.
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const status = await Geolocation.checkPermissions();
+      if (status.location === "granted") return { level: "success", detail: "Allowed" };
+      if (status.location === "denied")
+        return {
+          level: "danger",
+          detail: "Blocked",
+          explanation:
+            "Location is blocked for DairyOne. Trips can't be tracked or verified until you allow it in your phone's app settings.",
+        };
+      return {
+        level: "warning",
+        detail: "Not yet granted",
+        explanation: "Tap \"Fix now\" to allow location for DairyOne.",
+      };
+    } catch {
+      return { level: "muted", detail: "Couldn't check" };
+    }
+  }
+
   if (typeof navigator === "undefined" || !navigator.geolocation) {
     return {
       level: "danger",
@@ -203,6 +230,21 @@ export async function runReadinessChecks(): Promise<ReadinessCheck[]> {
 }
 
 export async function requestLocationPermission(): Promise<void> {
+  if (Capacitor.isNativePlatform()) {
+    // This is the actual fix: @capacitor/geolocation's requestPermissions()
+    // calls Android's ActivityCompat.requestPermissions() under the hood,
+    // which is what shows the system "Allow DairyOne to access this
+    // device's location?" dialog. Plain navigator.geolocation calls (what
+    // this used to do) have no way to trigger that dialog on native — they
+    // just fail silently if the OS permission isn't already granted.
+    try {
+      await Geolocation.requestPermissions();
+    } catch {
+      // Ignored — runReadinessChecks() right after this will reflect
+      // whatever the actual resulting permission state is.
+    }
+    return;
+  }
   if (typeof navigator === "undefined" || !navigator.geolocation) return;
   await new Promise<void>((resolve) => {
     navigator.geolocation.getCurrentPosition(

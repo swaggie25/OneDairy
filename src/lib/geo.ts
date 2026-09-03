@@ -1,9 +1,55 @@
+import { Capacitor } from "@capacitor/core";
+import { Geolocation } from "@capacitor/geolocation";
+
 /** Browser geolocation helper with a safe timeout and no throwing. */
 export type Coords = { lat: number | null; lng: number | null; accuracy: number | null };
 
 export const NO_COORDS: Coords = { lat: null, lng: null, accuracy: null };
 
-export function getCoords(timeoutMs = 8000): Promise<Coords> {
+/**
+ * On native (Capacitor Android/iOS), `navigator.geolocation` is backed by
+ * the WebView's Chromium geolocation implementation, which silently fails
+ * — no prompt, no error surfaced — unless the app already holds the OS-level
+ * ACCESS_FINE_LOCATION/ACCESS_COARSE_LOCATION runtime permission. Declaring
+ * the permission in AndroidManifest.xml is not enough on Android 6+; some
+ * native code has to actually call `requestPermissions`, which is exactly
+ * what the @capacitor/geolocation plugin does under the hood. This is why
+ * "Fix now" on the device-check screen used to do nothing on native: it
+ * called plain `navigator.geolocation.getCurrentPosition`, which has no way
+ * to trigger that system dialog. Routing native calls through this plugin
+ * instead fixes that — the web path is untouched.
+ */
+async function ensureNativePermission(): Promise<boolean> {
+  try {
+    const current = await Geolocation.checkPermissions();
+    if (current.location === "granted" || current.coarseLocation === "granted") return true;
+    const requested = await Geolocation.requestPermissions();
+    return requested.location === "granted" || requested.coarseLocation === "granted";
+  } catch {
+    return false;
+  }
+}
+
+export async function getCoords(timeoutMs = 8000): Promise<Coords> {
+  if (Capacitor.isNativePlatform()) {
+    const granted = await ensureNativePermission();
+    if (!granted) return NO_COORDS;
+    try {
+      const p = await Geolocation.getCurrentPosition({
+        enableHighAccuracy: true,
+        timeout: timeoutMs,
+        maximumAge: 15_000,
+      });
+      return {
+        lat: p.coords.latitude,
+        lng: p.coords.longitude,
+        accuracy: p.coords.accuracy ?? null,
+      };
+    } catch {
+      return NO_COORDS;
+    }
+  }
+
   if (typeof navigator === "undefined" || !navigator.geolocation) {
     return Promise.resolve(NO_COORDS);
   }
@@ -89,6 +135,32 @@ export function distanceToPathMeters(
 }
 
 export function watchCoords(onUpdate: (c: Coords) => void): () => void {
+  if (Capacitor.isNativePlatform()) {
+    let cancelled = false;
+    let watchId: string | null = null;
+    void ensureNativePermission().then((granted) => {
+      if (cancelled || !granted) return;
+      void Geolocation.watchPosition(
+        { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 },
+        (p) => {
+          if (!p) return;
+          onUpdate({
+            lat: p.coords.latitude,
+            lng: p.coords.longitude,
+            accuracy: p.coords.accuracy ?? null,
+          });
+        },
+      ).then((id) => {
+        if (cancelled) void Geolocation.clearWatch({ id });
+        else watchId = id;
+      });
+    });
+    return () => {
+      cancelled = true;
+      if (watchId) void Geolocation.clearWatch({ id: watchId });
+    };
+  }
+
   if (typeof navigator === "undefined" || !navigator.geolocation) {
     return () => {};
   }
