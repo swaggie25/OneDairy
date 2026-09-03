@@ -41,6 +41,7 @@ import {
   type RateSlab,
 } from "@/lib/pricing";
 import { evaluateCollection } from "@/lib/quality";
+import { openReceiptPreview } from "@/lib/receipt";
 
 export type MilkEntryTarget = {
   farmerId: string;
@@ -162,6 +163,10 @@ export function MilkEntryForm({
     amount: number;
     offline: boolean;
     savedAt: Date;
+    session: string;
+    fatPct: number | null;
+    snfPct: number | null;
+    ratePerLitre: number;
   } | null>(null);
 
   // PHASE 2 §"Quality entry" — a critical reading (water/antibiotic/fat/SNF
@@ -337,6 +342,10 @@ export function MilkEntryForm({
       amount,
       offline: result.synced === 0,
       savedAt: new Date(),
+      session,
+      fatPct,
+      snfPct,
+      ratePerLitre: rate,
     });
     setQuantity("");
     setFat("");
@@ -353,26 +362,26 @@ export function MilkEntryForm({
     onSaved?.();
   }
 
-  function printReceipt() {
-    const win = window.open("", "_blank", "width=320,height=520");
-    if (!win) {
-      toast.error("Allow pop-ups to print the receipt.");
-      return;
+  // PART — print is only offered AFTER the entry is saved (from the
+  // confirmation screen below), never mid-entry. Opens a receipt preview
+  // window with its own "Print receipt" button rather than triggering the
+  // OS print dialog immediately — the agent reviews it first.
+  function printSavedReceipt() {
+    if (!savedEntry) return;
+    const opened = openReceiptPreview({
+      farmerName: target.farmerName,
+      farmerCode: target.farmerCode,
+      session: savedEntry.session,
+      quantityLitres: savedEntry.quantityLitres,
+      fatPct: savedEntry.fatPct,
+      snfPct: savedEntry.snfPct,
+      ratePerLitre: savedEntry.ratePerLitre,
+      totalAmount: savedEntry.amount,
+      collectedAt: savedEntry.savedAt,
+    });
+    if (!opened) {
+      toast.error("Allow pop-ups to view the receipt.");
     }
-    win.document.write(`<pre style="font:12px monospace">
-DairyOne receipt
------------------------------
-Farmer : ${target.farmerName} (${target.farmerCode})
-Session: ${session}
-Qty    : ${quantityLitres} L
-Fat    : ${fatPct ?? "-"} %   SNF: ${snfPct ?? "-"}
-Rate   : ${formatCurrency(rate)}/L
-Amount : ${formatCurrency(amount)}
-Time   : ${new Date().toLocaleString()}
------------------------------
-</pre>`);
-    win.document.close();
-    win.print();
   }
 
   if (savedEntry) {
@@ -399,10 +408,20 @@ Time   : ${new Date().toLocaleString()}
             detail="will sync automatically"
           />
         )}
-        <Button size="lg" className="h-14 w-full text-base" onClick={nextFarmer}>
-          Next farmer
-          <ArrowRight className="h-5 w-5" />
-        </Button>
+        <div className="grid w-full gap-2 sm:grid-cols-2">
+          <Button
+            size="lg"
+            variant="outline"
+            className="h-14 text-base"
+            onClick={printSavedReceipt}
+          >
+            <Printer className="h-5 w-5" /> Print receipt
+          </Button>
+          <Button size="lg" className="h-14 text-base" onClick={nextFarmer}>
+            Next farmer
+            <ArrowRight className="h-5 w-5" />
+          </Button>
+        </div>
       </div>
     );
   }
@@ -704,28 +723,25 @@ Time   : ${new Date().toLocaleString()}
         </div>
       )}
 
-      <SignaturePad onChange={setSignature} />
+      {/* Sign pad removed for field/trip collections (target.source ===
+          "agent") — kept for centre walk-in entries. */}
+      {target.source !== "agent" && <SignaturePad onChange={setSignature} />}
 
-      <div className="grid gap-2 sm:grid-cols-2">
-        <Button
-          size="lg"
-          className="h-14 text-base"
-          onClick={save}
-          disabled={saving || geofence.locked || gated}
-        >
-          <Save className="h-5 w-5" />
-          {saving
-            ? "Saving…"
-            : geofence.locked
-              ? "Move closer to collect"
-              : gated
-                ? "Resolve quality alert to save"
-                : "Save entry"}
-        </Button>
-        <Button size="lg" variant="outline" className="h-14 text-base" onClick={printReceipt}>
-          <Printer className="h-5 w-5" /> Print receipt
-        </Button>
-      </div>
+      <Button
+        size="lg"
+        className="h-14 w-full text-base"
+        onClick={save}
+        disabled={saving || geofence.locked || gated}
+      >
+        <Save className="h-5 w-5" />
+        {saving
+          ? "Saving…"
+          : geofence.locked
+            ? "Move closer to collect"
+            : gated
+              ? "Resolve quality alert to save"
+              : "Save entry"}
+      </Button>
       <p className="flex items-center gap-2 text-xs text-muted-foreground">
         <CloudOff className="h-3.5 w-3.5" /> Entries save on-device first and sync automatically.
       </p>

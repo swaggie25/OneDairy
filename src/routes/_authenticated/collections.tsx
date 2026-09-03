@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, CloudUpload, Droplets, RefreshCw, Search, X } from "lucide-react";
+import { ArrowLeft, CloudUpload, Droplets, Printer, RefreshCw, Search, X } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell, PageHeading, StatCard } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ import {
 import { useAgentContext } from "@/hooks/useAgentContext";
 import { useOfflineQueue } from "@/hooks/useOfflineQueue";
 import { formatCurrency } from "@/lib/pricing";
+import { openReceiptPreview } from "@/lib/receipt";
 import { requireRole } from "@/lib/route-guards";
 
 export const Route = createFileRoute("/_authenticated/collections")({
@@ -58,6 +60,10 @@ const PERIOD_LABEL: Record<Period, string> = {
   custom: "Custom range",
 };
 
+// ITEM 4 (bugfix follow-up) — "Today" is now the default view; every other
+// period (including "All time") is an opt-in filter the agent applies.
+const DEFAULT_PERIOD: Period = "today";
+
 function startOfWeek(d: Date) {
   const date = new Date(d);
   const day = date.getDay(); // 0 = Sunday
@@ -87,7 +93,7 @@ function CollectionsScreen() {
   const { data: agent } = useAgentContext();
   const { pending, online, flush } = useOfflineQueue();
 
-  const [period, setPeriod] = useState<Period>("all");
+  const [period, setPeriod] = useState<Period>(DEFAULT_PERIOD);
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const [nameQuery, setNameQuery] = useState("");
@@ -98,7 +104,7 @@ function CollectionsScreen() {
   const rangeTo = period === "custom" && customTo ? new Date(`${customTo}T23:59:59`) : null;
 
   const hasFilters =
-    period !== "all" || nameQuery.trim().length > 0 || locationQuery.trim().length > 0;
+    period !== DEFAULT_PERIOD || nameQuery.trim().length > 0 || locationQuery.trim().length > 0;
 
   const { data: rows, isLoading } = useQuery({
     queryKey: [
@@ -162,7 +168,7 @@ function CollectionsScreen() {
         subtitle={
           hasFilters
             ? `${filteredRows.length} entr${filteredRows.length === 1 ? "y" : "ies"} matching your filters.`
-            : "Last 100 entries captured on this account."
+            : `${filteredRows.length} entr${filteredRows.length === 1 ? "y" : "ies"} collected today.`
         }
       />
 
@@ -247,7 +253,7 @@ function CollectionsScreen() {
             size="sm"
             className="h-8"
             onClick={() => {
-              setPeriod("all");
+              setPeriod(DEFAULT_PERIOD);
               setCustomFrom("");
               setCustomTo("");
               setNameQuery("");
@@ -302,7 +308,7 @@ function CollectionsScreen() {
                     <p className="text-sm text-muted-foreground">
                       {formatCurrency(Number(row.total_amount ?? 0))}
                     </p>
-                    <div className="mt-1 flex justify-end gap-1">
+                    <div className="mt-1 flex items-center justify-end gap-1">
                       {Number(row.risk_score ?? 0) >= 40 && (
                         <StatusBadge status="danger" label="Flagged" size="sm" />
                       )}
@@ -311,6 +317,29 @@ function CollectionsScreen() {
                         label={row.status}
                         size="sm"
                       />
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0"
+                        title="Reprint receipt"
+                        aria-label={`Reprint receipt for ${row.farmers?.full_name ?? "farmer"}`}
+                        onClick={() => {
+                          const opened = openReceiptPreview({
+                            farmerName: row.farmers?.full_name ?? "Farmer",
+                            farmerCode: row.farmers?.farmer_code ?? "",
+                            session: row.session,
+                            quantityLitres: Number(row.quantity_litres ?? 0),
+                            fatPct: row.fat_pct != null ? Number(row.fat_pct) : null,
+                            snfPct: row.snf_pct != null ? Number(row.snf_pct) : null,
+                            ratePerLitre: Number(row.rate_per_litre ?? 0),
+                            totalAmount: Number(row.total_amount ?? 0),
+                            collectedAt: row.collected_at,
+                          });
+                          if (!opened) toast.error("Allow pop-ups to view the receipt.");
+                        }}
+                      >
+                        <Printer className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
                   </div>
                 </li>

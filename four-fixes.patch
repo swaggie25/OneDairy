@@ -1,0 +1,529 @@
+diff --git a/src/components/milk-entry-form.tsx b/src/components/milk-entry-form.tsx
+index 9e1ddc0..9e4fbc1 100644
+--- a/src/components/milk-entry-form.tsx
++++ b/src/components/milk-entry-form.tsx
+@@ -41,6 +41,7 @@ import {
+   type RateSlab,
+ } from "@/lib/pricing";
+ import { evaluateCollection } from "@/lib/quality";
++import { openReceiptPreview } from "@/lib/receipt";
+ 
+ export type MilkEntryTarget = {
+   farmerId: string;
+@@ -162,6 +163,10 @@ export function MilkEntryForm({
+     amount: number;
+     offline: boolean;
+     savedAt: Date;
++    session: string;
++    fatPct: number | null;
++    snfPct: number | null;
++    ratePerLitre: number;
+   } | null>(null);
+ 
+   // PHASE 2 §"Quality entry" — a critical reading (water/antibiotic/fat/SNF
+@@ -337,6 +342,10 @@ export function MilkEntryForm({
+       amount,
+       offline: result.synced === 0,
+       savedAt: new Date(),
++      session,
++      fatPct,
++      snfPct,
++      ratePerLitre: rate,
+     });
+     setQuantity("");
+     setFat("");
+@@ -353,26 +362,26 @@ export function MilkEntryForm({
+     onSaved?.();
+   }
+ 
+-  function printReceipt() {
+-    const win = window.open("", "_blank", "width=320,height=520");
+-    if (!win) {
+-      toast.error("Allow pop-ups to print the receipt.");
+-      return;
++  // PART — print is only offered AFTER the entry is saved (from the
++  // confirmation screen below), never mid-entry. Opens a receipt preview
++  // window with its own "Print receipt" button rather than triggering the
++  // OS print dialog immediately — the agent reviews it first.
++  function printSavedReceipt() {
++    if (!savedEntry) return;
++    const opened = openReceiptPreview({
++      farmerName: target.farmerName,
++      farmerCode: target.farmerCode,
++      session: savedEntry.session,
++      quantityLitres: savedEntry.quantityLitres,
++      fatPct: savedEntry.fatPct,
++      snfPct: savedEntry.snfPct,
++      ratePerLitre: savedEntry.ratePerLitre,
++      totalAmount: savedEntry.amount,
++      collectedAt: savedEntry.savedAt,
++    });
++    if (!opened) {
++      toast.error("Allow pop-ups to view the receipt.");
+     }
+-    win.document.write(`<pre style="font:12px monospace">
+-DairyOne receipt
+------------------------------
+-Farmer : ${target.farmerName} (${target.farmerCode})
+-Session: ${session}
+-Qty    : ${quantityLitres} L
+-Fat    : ${fatPct ?? "-"} %   SNF: ${snfPct ?? "-"}
+-Rate   : ${formatCurrency(rate)}/L
+-Amount : ${formatCurrency(amount)}
+-Time   : ${new Date().toLocaleString()}
+------------------------------
+-</pre>`);
+-    win.document.close();
+-    win.print();
+   }
+ 
+   if (savedEntry) {
+@@ -399,10 +408,20 @@ Time   : ${new Date().toLocaleString()}
+             detail="will sync automatically"
+           />
+         )}
+-        <Button size="lg" className="h-14 w-full text-base" onClick={nextFarmer}>
+-          Next farmer
+-          <ArrowRight className="h-5 w-5" />
+-        </Button>
++        <div className="grid w-full gap-2 sm:grid-cols-2">
++          <Button
++            size="lg"
++            variant="outline"
++            className="h-14 text-base"
++            onClick={printSavedReceipt}
++          >
++            <Printer className="h-5 w-5" /> Print receipt
++          </Button>
++          <Button size="lg" className="h-14 text-base" onClick={nextFarmer}>
++            Next farmer
++            <ArrowRight className="h-5 w-5" />
++          </Button>
++        </div>
+       </div>
+     );
+   }
+@@ -704,28 +723,25 @@ Time   : ${new Date().toLocaleString()}
+         </div>
+       )}
+ 
+-      <SignaturePad onChange={setSignature} />
+-
+-      <div className="grid gap-2 sm:grid-cols-2">
+-        <Button
+-          size="lg"
+-          className="h-14 text-base"
+-          onClick={save}
+-          disabled={saving || geofence.locked || gated}
+-        >
+-          <Save className="h-5 w-5" />
+-          {saving
+-            ? "Saving…"
+-            : geofence.locked
+-              ? "Move closer to collect"
+-              : gated
+-                ? "Resolve quality alert to save"
+-                : "Save entry"}
+-        </Button>
+-        <Button size="lg" variant="outline" className="h-14 text-base" onClick={printReceipt}>
+-          <Printer className="h-5 w-5" /> Print receipt
+-        </Button>
+-      </div>
++      {/* Sign pad removed for field/trip collections (target.source ===
++          "agent") — kept for centre walk-in entries. */}
++      {target.source !== "agent" && <SignaturePad onChange={setSignature} />}
++
++      <Button
++        size="lg"
++        className="h-14 w-full text-base"
++        onClick={save}
++        disabled={saving || geofence.locked || gated}
++      >
++        <Save className="h-5 w-5" />
++        {saving
++          ? "Saving…"
++          : geofence.locked
++            ? "Move closer to collect"
++            : gated
++              ? "Resolve quality alert to save"
++              : "Save entry"}
++      </Button>
+       <p className="flex items-center gap-2 text-xs text-muted-foreground">
+         <CloudOff className="h-3.5 w-3.5" /> Entries save on-device first and sync automatically.
+       </p>
+diff --git a/src/lib/receipt.ts b/src/lib/receipt.ts
+new file mode 100644
+index 0000000..ea29e0d
+--- /dev/null
++++ b/src/lib/receipt.ts
+@@ -0,0 +1,71 @@
++import { formatCurrency } from "@/lib/pricing";
++
++export type ReceiptData = {
++  farmerName: string;
++  farmerCode: string;
++  session: string;
++  quantityLitres: number;
++  fatPct: number | null;
++  snfPct: number | null;
++  ratePerLitre: number;
++  totalAmount: number;
++  collectedAt: string | Date;
++};
++
++/**
++ * Opens a receipt preview window with its own in-page "Print" button.
++ *
++ * Deliberately does NOT call `window.print()` itself — the agent reviews the
++ * receipt first and prints on demand, instead of a print dialog firing the
++ * instant the window opens. Used both right after saving an entry and for
++ * reprinting a past entry from My collections.
++ */
++export function openReceiptPreview(data: ReceiptData): boolean {
++  const win = window.open("", "_blank", "width=340,height=560");
++  if (!win) return false;
++
++  const when = new Date(data.collectedAt).toLocaleString();
++
++  win.document.write(`<!doctype html>
++<html>
++<head>
++<title>DairyOne receipt — ${data.farmerName}</title>
++<style>
++  body { font-family: ui-monospace, monospace; padding: 16px; color: #0f172a; }
++  pre { font-size: 12px; white-space: pre-wrap; }
++  button {
++    margin-top: 12px;
++    width: 100%;
++    height: 44px;
++    font-size: 14px;
++    font-weight: 600;
++    border-radius: 8px;
++    border: 1px solid #0f172a;
++    background: #0f172a;
++    color: #fff;
++    cursor: pointer;
++  }
++  @media print {
++    button { display: none; }
++  }
++</style>
++</head>
++<body>
++<pre>
++DairyOne receipt
++-----------------------------
++Farmer : ${data.farmerName} (${data.farmerCode})
++Session: ${data.session}
++Qty    : ${data.quantityLitres} L
++Fat    : ${data.fatPct ?? "-"} %   SNF: ${data.snfPct ?? "-"}
++Rate   : ${formatCurrency(data.ratePerLitre)}/L
++Amount : ${formatCurrency(data.totalAmount)}
++Time   : ${when}
++-----------------------------
++</pre>
++<button onclick="window.print()">Print receipt</button>
++</body>
++</html>`);
++  win.document.close();
++  return true;
++}
+diff --git a/src/routes/_authenticated/collections.tsx b/src/routes/_authenticated/collections.tsx
+index 84fca72..7639981 100644
+--- a/src/routes/_authenticated/collections.tsx
++++ b/src/routes/_authenticated/collections.tsx
+@@ -1,7 +1,8 @@
+ import { useMemo, useState } from "react";
+ import { createFileRoute, Link } from "@tanstack/react-router";
+ import { useQuery } from "@tanstack/react-query";
+-import { ArrowLeft, CloudUpload, Droplets, RefreshCw, Search, X } from "lucide-react";
++import { ArrowLeft, CloudUpload, Droplets, Printer, RefreshCw, Search, X } from "lucide-react";
++import { toast } from "sonner";
+ import { supabase } from "@/integrations/supabase/client";
+ import { AppShell, PageHeading, StatCard } from "@/components/app-shell";
+ import { Button } from "@/components/ui/button";
+@@ -18,6 +19,7 @@ import {
+ import { useAgentContext } from "@/hooks/useAgentContext";
+ import { useOfflineQueue } from "@/hooks/useOfflineQueue";
+ import { formatCurrency } from "@/lib/pricing";
++import { openReceiptPreview } from "@/lib/receipt";
+ import { requireRole } from "@/lib/route-guards";
+ 
+ export const Route = createFileRoute("/_authenticated/collections")({
+@@ -58,6 +60,10 @@ const PERIOD_LABEL: Record<Period, string> = {
+   custom: "Custom range",
+ };
+ 
++// ITEM 4 (bugfix follow-up) — "Today" is now the default view; every other
++// period (including "All time") is an opt-in filter the agent applies.
++const DEFAULT_PERIOD: Period = "today";
++
+ function startOfWeek(d: Date) {
+   const date = new Date(d);
+   const day = date.getDay(); // 0 = Sunday
+@@ -87,7 +93,7 @@ function CollectionsScreen() {
+   const { data: agent } = useAgentContext();
+   const { pending, online, flush } = useOfflineQueue();
+ 
+-  const [period, setPeriod] = useState<Period>("all");
++  const [period, setPeriod] = useState<Period>(DEFAULT_PERIOD);
+   const [customFrom, setCustomFrom] = useState("");
+   const [customTo, setCustomTo] = useState("");
+   const [nameQuery, setNameQuery] = useState("");
+@@ -98,7 +104,7 @@ function CollectionsScreen() {
+   const rangeTo = period === "custom" && customTo ? new Date(`${customTo}T23:59:59`) : null;
+ 
+   const hasFilters =
+-    period !== "all" || nameQuery.trim().length > 0 || locationQuery.trim().length > 0;
++    period !== DEFAULT_PERIOD || nameQuery.trim().length > 0 || locationQuery.trim().length > 0;
+ 
+   const { data: rows, isLoading } = useQuery({
+     queryKey: [
+@@ -162,7 +168,7 @@ function CollectionsScreen() {
+         subtitle={
+           hasFilters
+             ? `${filteredRows.length} entr${filteredRows.length === 1 ? "y" : "ies"} matching your filters.`
+-            : "Last 100 entries captured on this account."
++            : `${filteredRows.length} entr${filteredRows.length === 1 ? "y" : "ies"} collected today.`
+         }
+       />
+ 
+@@ -247,7 +253,7 @@ function CollectionsScreen() {
+             size="sm"
+             className="h-8"
+             onClick={() => {
+-              setPeriod("all");
++              setPeriod(DEFAULT_PERIOD);
+               setCustomFrom("");
+               setCustomTo("");
+               setNameQuery("");
+@@ -302,7 +308,7 @@ function CollectionsScreen() {
+                     <p className="text-sm text-muted-foreground">
+                       {formatCurrency(Number(row.total_amount ?? 0))}
+                     </p>
+-                    <div className="mt-1 flex justify-end gap-1">
++                    <div className="mt-1 flex items-center justify-end gap-1">
+                       {Number(row.risk_score ?? 0) >= 40 && (
+                         <StatusBadge status="danger" label="Flagged" size="sm" />
+                       )}
+@@ -311,6 +317,29 @@ function CollectionsScreen() {
+                         label={row.status}
+                         size="sm"
+                       />
++                      <Button
++                        size="sm"
++                        variant="ghost"
++                        className="h-7 w-7 p-0"
++                        title="Reprint receipt"
++                        aria-label={`Reprint receipt for ${row.farmers?.full_name ?? "farmer"}`}
++                        onClick={() => {
++                          const opened = openReceiptPreview({
++                            farmerName: row.farmers?.full_name ?? "Farmer",
++                            farmerCode: row.farmers?.farmer_code ?? "",
++                            session: row.session,
++                            quantityLitres: Number(row.quantity_litres ?? 0),
++                            fatPct: row.fat_pct != null ? Number(row.fat_pct) : null,
++                            snfPct: row.snf_pct != null ? Number(row.snf_pct) : null,
++                            ratePerLitre: Number(row.rate_per_litre ?? 0),
++                            totalAmount: Number(row.total_amount ?? 0),
++                            collectedAt: row.collected_at,
++                          });
++                          if (!opened) toast.error("Allow pop-ups to view the receipt.");
++                        }}
++                      >
++                        <Printer className="h-3.5 w-3.5" />
++                      </Button>
+                     </div>
+                   </div>
+                 </li>
+diff --git a/src/routes/_authenticated/trip.tsx b/src/routes/_authenticated/trip.tsx
+index 461f90b..7240521 100644
+--- a/src/routes/_authenticated/trip.tsx
++++ b/src/routes/_authenticated/trip.tsx
+@@ -8,6 +8,8 @@ import {
+   MapPin,
+   Home,
+   Navigation2,
++  Phone,
++  Printer,
+   QrCode,
+   AlertTriangle,
+   CloudOff,
+@@ -47,6 +49,7 @@ import { QrScanner } from "@/components/qr-scanner";
+ import { cardCodeFor } from "@/lib/qr";
+ import { exceptionLabel } from "@/lib/exceptions";
+ import { requireRole } from "@/lib/route-guards";
++import { openReceiptPreview } from "@/lib/receipt";
+ 
+ const AgentTripMap = lazy(() => import("@/components/agent-trip-map"));
+ 
+@@ -75,6 +78,7 @@ type Farmer = {
+   full_name: string;
+   farmer_code: string;
+   village: string | null;
++  phone: string | null;
+ };
+ 
+ type RoutePoint = {
+@@ -111,6 +115,9 @@ function TripScreen() {
+ 
+   const [scanOpen, setScanOpen] = useState(false);
+ 
++  // Reprint — pick which of today's saved receipts on this trip to reprint.
++  const [reprintOpen, setReprintOpen] = useState(false);
++
+   // PHASE 1 §5 — Exception Basics. `exceptionTarget` is either a farmer
+   // (unavailable/skipped) or null with routePointId set (route issue/other).
+   const [exceptionTarget, setExceptionTarget] = useState<{
+@@ -285,7 +292,8 @@ function TripScreen() {
+           id,
+           full_name,
+           farmer_code,
+-          village
++          village,
++          phone
+         `,
+         )
+         .in("id", farmerIds)
+@@ -339,10 +347,16 @@ function TripScreen() {
+           id,
+           farmer_id,
+           quantity_litres,
+-          total_amount
++          total_amount,
++          session,
++          fat_pct,
++          snf_pct,
++          rate_per_litre,
++          collected_at
+         `,
+         )
+-        .eq("trip_id", trip.id);
++        .eq("trip_id", trip.id)
++        .order("collected_at", { ascending: false });
+ 
+       if (error) {
+         console.error("TRIP COLLECTION ERROR:", error);
+@@ -989,12 +1003,25 @@ function TripScreen() {
+               <ul className="mt-3 divide-y divide-border rounded-lg border border-border">
+                 {currentStop.farmers.map((farmer) => (
+                   <li key={farmer.id} className="flex items-center justify-between gap-3 p-3">
+-                    <div>
+-                      <p className="text-sm font-medium">{farmer.full_name}</p>
+-                      <p className="text-xs text-muted-foreground">
+-                        {farmer.farmer_code}
+-                        {farmer.village ? ` · ${farmer.village}` : ""}
+-                      </p>
++                    <div className="flex min-w-0 items-center gap-2">
++                      {farmer.phone && (
++                        <a
++                          href={`tel:${farmer.phone}`}
++                          title={`Call ${farmer.full_name}`}
++                          aria-label={`Call ${farmer.full_name}`}
++                          onClick={(e) => e.stopPropagation()}
++                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-status-active/10 text-status-active"
++                        >
++                          <Phone className="h-4 w-4" />
++                        </a>
++                      )}
++                      <div className="min-w-0">
++                        <p className="truncate text-sm font-medium">{farmer.full_name}</p>
++                        <p className="truncate text-xs text-muted-foreground">
++                          {farmer.farmer_code}
++                          {farmer.village ? ` · ${farmer.village}` : ""}
++                        </p>
++                      </div>
+                     </div>
+                     {farmerAction(farmer, currentStop.id)}
+                   </li>
+@@ -1020,10 +1047,21 @@ function TripScreen() {
+         </div>
+       )}
+ 
+-      <Button variant="outline" className="mb-4 h-12 w-full" onClick={() => setScanOpen(true)}>
+-        <QrCode className="h-4 w-4" />
+-        Scan farmer QR card
+-      </Button>
++      <div className="mb-4 grid grid-cols-2 gap-2">
++        <Button variant="outline" className="h-12 w-full" onClick={() => setScanOpen(true)}>
++          <QrCode className="h-4 w-4" />
++          Scan farmer QR card
++        </Button>
++        <Button
++          variant="outline"
++          className="h-12 w-full"
++          disabled={todayCollections.length === 0}
++          onClick={() => setReprintOpen(true)}
++        >
++          <Printer className="h-4 w-4" />
++          Reprint receipt
++        </Button>
++      </div>
+ 
+       {loadingFarmers && (
+         <div className="mb-4 text-center text-sm text-muted-foreground">Loading farmers...</div>
+@@ -1140,6 +1178,64 @@ function TripScreen() {
+         </DialogContent>
+       </Dialog>
+ 
++      {/* REPRINT — pick which of today's saved entries on this trip to
++          reprint. Same preview-first receipt helper as the post-save
++          "Print receipt" button, so it's never a silent direct print. */}
++      <Dialog open={reprintOpen} onOpenChange={setReprintOpen}>
++        <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-sm">
++          <DialogHeader>
++            <DialogTitle>Reprint receipt</DialogTitle>
++          </DialogHeader>
++
++          <ul className="divide-y divide-border rounded-lg border border-border">
++            {todayCollections.map((collection) => {
++              const farmer = farmers.find((f) => f.id === collection.farmer_id);
++              return (
++                <li key={collection.id} className="flex items-center justify-between gap-3 p-3">
++                  <div className="min-w-0">
++                    <p className="truncate text-sm font-medium">{farmer?.full_name ?? "Farmer"}</p>
++                    <p className="text-xs text-muted-foreground">
++                      {farmer?.farmer_code} · {Number(collection.quantity_litres ?? 0).toFixed(1)} L
++                      ·{" "}
++                      {new Date(collection.collected_at).toLocaleTimeString([], {
++                        hour: "2-digit",
++                        minute: "2-digit",
++                      })}
++                    </p>
++                  </div>
++                  <Button
++                    size="sm"
++                    variant="outline"
++                    className="shrink-0"
++                    onClick={() => {
++                      const opened = openReceiptPreview({
++                        farmerName: farmer?.full_name ?? "Farmer",
++                        farmerCode: farmer?.farmer_code ?? "",
++                        session: collection.session,
++                        quantityLitres: Number(collection.quantity_litres ?? 0),
++                        fatPct: collection.fat_pct != null ? Number(collection.fat_pct) : null,
++                        snfPct: collection.snf_pct != null ? Number(collection.snf_pct) : null,
++                        ratePerLitre: Number(collection.rate_per_litre ?? 0),
++                        totalAmount: Number(collection.total_amount ?? 0),
++                        collectedAt: collection.collected_at,
++                      });
++                      if (!opened) toast.error("Allow pop-ups to view the receipt.");
++                    }}
++                  >
++                    <Printer className="h-3.5 w-3.5" />
++                  </Button>
++                </li>
++              );
++            })}
++            {todayCollections.length === 0 && (
++              <li className="p-3 text-sm text-muted-foreground">
++                No entries saved on this trip yet.
++              </li>
++            )}
++          </ul>
++        </DialogContent>
++      </Dialog>
++
+       {/* MILK ENTRY */}
+ 
+       <Dialog
