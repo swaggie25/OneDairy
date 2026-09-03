@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedAccountantRouteImport } from './routes/_authenticated/accountant'
 import { Route as AuthenticatedAgentRouteImport } from './routes/_authenticated/agent'
+import { Route as AuthenticatedAgentHandoversRouteImport } from './routes/_authenticated/agent-handovers'
 import { Route as AuthenticatedBuyerRouteImport } from './routes/_authenticated/buyer'
 import { Route as AuthenticatedCardsRouteImport } from './routes/_authenticated/cards'
 import { Route as AuthenticatedCollectRouteImport } from './routes/_authenticated/collect'
@@ -61,6 +62,12 @@ const AuthenticatedAgentRoute = AuthenticatedAgentRouteImport.update({
   path: '/agent',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAgentHandoversRoute =
+  AuthenticatedAgentHandoversRouteImport.update({
+    id: '/agent-handovers',
+    path: '/agent-handovers',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedBuyerRoute = AuthenticatedBuyerRouteImport.update({
   id: '/buyer',
   path: '/buyer',
@@ -182,6 +189,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/accountant': typeof AuthenticatedAccountantRoute
   '/agent': typeof AuthenticatedAgentRoute
+  '/agent-handovers': typeof AuthenticatedAgentHandoversRoute
   '/buyer': typeof AuthenticatedBuyerRoute
   '/cards': typeof AuthenticatedCardsRoute
   '/collect': typeof AuthenticatedCollectRoute
@@ -210,6 +218,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/accountant': typeof AuthenticatedAccountantRoute
   '/agent': typeof AuthenticatedAgentRoute
+  '/agent-handovers': typeof AuthenticatedAgentHandoversRoute
   '/buyer': typeof AuthenticatedBuyerRoute
   '/cards': typeof AuthenticatedCardsRoute
   '/collect': typeof AuthenticatedCollectRoute
@@ -240,6 +249,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/accountant': typeof AuthenticatedAccountantRoute
   '/_authenticated/agent': typeof AuthenticatedAgentRoute
+  '/_authenticated/agent-handovers': typeof AuthenticatedAgentHandoversRoute
   '/_authenticated/buyer': typeof AuthenticatedBuyerRoute
   '/_authenticated/cards': typeof AuthenticatedCardsRoute
   '/_authenticated/collect': typeof AuthenticatedCollectRoute
@@ -270,6 +280,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/accountant'
     | '/agent'
+    | '/agent-handovers'
     | '/buyer'
     | '/cards'
     | '/collect'
@@ -298,6 +309,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/accountant'
     | '/agent'
+    | '/agent-handovers'
     | '/buyer'
     | '/cards'
     | '/collect'
@@ -327,6 +339,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/_authenticated/accountant'
     | '/_authenticated/agent'
+    | '/_authenticated/agent-handovers'
     | '/_authenticated/buyer'
     | '/_authenticated/cards'
     | '/_authenticated/collect'
@@ -392,6 +405,13 @@ declare module '@tanstack/react-router' {
       path: '/agent'
       fullPath: '/agent'
       preLoaderRoute: typeof AuthenticatedAgentRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/agent-handovers': {
+      id: '/_authenticated/agent-handovers'
+      path: '/agent-handovers'
+      fullPath: '/agent-handovers'
+      preLoaderRoute: typeof AuthenticatedAgentHandoversRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/buyer': {
@@ -567,6 +587,7 @@ const AuthenticatedHandoverRouteWithChildren =
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAccountantRoute: typeof AuthenticatedAccountantRoute
   AuthenticatedAgentRoute: typeof AuthenticatedAgentRoute
+  AuthenticatedAgentHandoversRoute: typeof AuthenticatedAgentHandoversRoute
   AuthenticatedBuyerRoute: typeof AuthenticatedBuyerRoute
   AuthenticatedCardsRoute: typeof AuthenticatedCardsRoute
   AuthenticatedCollectRoute: typeof AuthenticatedCollectRoute
@@ -593,6 +614,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAccountantRoute: AuthenticatedAccountantRoute,
   AuthenticatedAgentRoute: AuthenticatedAgentRoute,
+  AuthenticatedAgentHandoversRoute: AuthenticatedAgentHandoversRoute,
   AuthenticatedBuyerRoute: AuthenticatedBuyerRoute,
   AuthenticatedCardsRoute: AuthenticatedCardsRoute,
   AuthenticatedCollectRoute: AuthenticatedCollectRoute,

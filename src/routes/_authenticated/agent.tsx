@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -15,6 +15,8 @@ import {
   ShieldCheck,
   IndianRupee,
   ListChecks,
+  Truck,
+  ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,6 +24,8 @@ import { AppShell, PageHeading, StatCard } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { StatusBadge, type Status } from "@/components/ui/status-badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { exceptionLabel } from "@/lib/exceptions";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useAgentContext } from "@/hooks/useAgentContext";
 import { useOfflineQueue } from "@/hooks/useOfflineQueue";
@@ -70,6 +74,13 @@ export const Route = createFileRoute("/_authenticated/agent")({
 function today() {
   return new Date().toISOString().slice(0, 10);
 }
+
+const HANDOVER_STATUS_LABEL: Record<string, string> = {
+  declared: "Awaiting MCC receipt",
+  received: "Received",
+  variance_flagged: "Variance flagged",
+  acknowledged: "Acknowledged",
+};
 
 function AgentHome() {
   const { data: user } = useCurrentUser();
@@ -174,6 +185,71 @@ function AgentHome() {
         .eq("status", "open")
         .gte("created_at", `${today()}T00:00:00Z`);
       return count ?? 0;
+    },
+  });
+
+  // Item 3 — the "N open exceptions" strip is openable: fetch the actual
+  // rows (only once the agent taps it) so they can see what's wrong and
+  // resolve it right from Agent home, instead of only a bare count.
+  const [exceptionsOpen, setExceptionsOpen] = useState(false);
+  const { data: exceptionRows = [] } = useQuery({
+    queryKey: ["agent-open-exceptions-detail", agent?.agentId],
+    enabled: Boolean(agent?.agentId) && exceptionsOpen,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("trip_exceptions")
+        .select("id, type, reason, created_at, farmer_id, farmers(full_name)")
+        .eq("agent_id", agent!.agentId)
+        .eq("status", "open")
+        .gte("created_at", `${today()}T00:00:00Z`)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const resolveException = useMutation({
+    mutationFn: async (id: string) => {
+      const { data: auth } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from("trip_exceptions")
+        .update({
+          status: "resolved",
+          resolved_at: new Date().toISOString(),
+          resolved_by: auth.user?.id ?? null,
+        })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["agent-open-exceptions"] });
+      void queryClient.invalidateQueries({ queryKey: ["agent-open-exceptions-detail"] });
+      toast.success("Exception resolved");
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  // Item 2 — handover status card: latest handover this agent declared, plus
+  // how many across their history still need MCC action, so Agent home
+  // links straight to the full history instead of the agent having to
+  // remember a trip id.
+  const { data: handoverSummary } = useQuery({
+    queryKey: ["agent-handover-summary", agent?.agentId],
+    enabled: Boolean(agent?.agentId),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("mcc_handovers")
+        .select("id, trip_id, status, declared_quantity_litres, variance_litres, trip_date")
+        .eq("agent_id", agent!.agentId)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      const rows = data ?? [];
+      return {
+        latest: rows[0] ?? null,
+        pending: rows.filter((r) => r.status === "declared" || r.status === "variance_flagged")
+          .length,
+      };
     },
   });
 
@@ -616,13 +692,81 @@ function AgentHome() {
       )}
 
       {Boolean(openExceptions) && (
-        <div className="surface-card mt-3 flex items-center gap-3 border-status-warning/30 bg-status-warning-soft p-4">
+        <button
+          type="button"
+          className="surface-card mt-3 flex w-full items-center gap-3 border-status-warning/30 bg-status-warning-soft p-4 text-left"
+          onClick={() => setExceptionsOpen(true)}
+        >
           <Icon icon={AlertTriangle} size="md" tone="warning" />
           <p className="flex-1 text-sm text-muted-foreground">
             {openExceptions} open exception{openExceptions === 1 ? "" : "s"} logged today.
           </p>
-        </div>
+          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </button>
       )}
+
+      {/* Handover status/history card — see hooks above for the summary query. */}
+      {agent && handoverSummary?.latest && (
+        <Link
+          to="/agent-handovers"
+          className="surface-card mt-3 flex items-center gap-3 p-4"
+        >
+          <Icon icon={Truck} size="md" tone="active" />
+          <div className="flex-1">
+            <p className="text-sm font-medium">
+              Last handover: {Number(handoverSummary.latest.declared_quantity_litres).toFixed(1)} L
+              {" · "}
+              {HANDOVER_STATUS_LABEL[handoverSummary.latest.status] ?? handoverSummary.latest.status}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {handoverSummary.pending > 0
+                ? `${handoverSummary.pending} handover${handoverSummary.pending === 1 ? "" : "s"} need MCC action`
+                : "Tap to see your full handover history"}
+            </p>
+          </div>
+          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </Link>
+      )}
+
+      <Dialog open={exceptionsOpen} onOpenChange={setExceptionsOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Today's open exceptions</DialogTitle>
+          </DialogHeader>
+          <ul className="max-h-[60vh] divide-y divide-border overflow-y-auto">
+            {exceptionRows.map((e) => (
+              <li key={e.id} className="flex items-center justify-between gap-3 py-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">{exceptionLabel(e.type)}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {e.farmers?.full_name ? `${e.farmers.full_name} · ` : ""}
+                    {e.reason || "No note added"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {new Date(e.created_at).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={resolveException.isPending}
+                  onClick={() => resolveException.mutate(e.id)}
+                >
+                  Mark fixed
+                </Button>
+              </li>
+            ))}
+            {exceptionRows.length === 0 && (
+              <li className="py-6 text-center text-sm text-muted-foreground">
+                No open exceptions right now.
+              </li>
+            )}
+          </ul>
+        </DialogContent>
+      </Dialog>
 
       {!agent?.routeId && agent && (
         <div className="surface-card mt-5 flex flex-col items-center p-8 text-center">

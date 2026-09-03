@@ -1,0 +1,863 @@
+diff --git a/src/routes/_authenticated/agent-handovers.tsx b/src/routes/_authenticated/agent-handovers.tsx
+new file mode 100644
+index 0000000..3c2a20a
+--- /dev/null
++++ b/src/routes/_authenticated/agent-handovers.tsx
+@@ -0,0 +1,129 @@
++import { createFileRoute, Link } from "@tanstack/react-router";
++import { useQuery } from "@tanstack/react-query";
++import { ArrowLeft, Truck } from "lucide-react";
++import { supabase } from "@/integrations/supabase/client";
++import { AppShell, PageHeading, StatCard } from "@/components/app-shell";
++import { Button } from "@/components/ui/button";
++import { Icon } from "@/components/ui/icon";
++import { StatusBadge, type Status } from "@/components/ui/status-badge";
++import { useAgentContext } from "@/hooks/useAgentContext";
++import { requireRole } from "@/lib/route-guards";
++
++export const Route = createFileRoute("/_authenticated/agent-handovers")({
++  beforeLoad: ({ context }) => requireRole(context.profile, ["agent"]),
++  head: () => ({
++    meta: [
++      { title: "My handovers — DairyOne" },
++      {
++        name: "description",
++        content:
++          "Every milk handover you declared at the MCC, with received quantity, variance and status.",
++      },
++    ],
++  }),
++  component: AgentHandoversScreen,
++});
++
++const STATUS_COPY: Record<string, { label: string; status: Status }> = {
++  declared: { label: "Awaiting MCC receipt", status: "muted" },
++  received: { label: "Received — matched", status: "success" },
++  variance_flagged: { label: "Variance flagged", status: "warning" },
++  acknowledged: { label: "Acknowledged", status: "success" },
++};
++
++/**
++ * ITEM 2 — Agent-facing handover status/history. Reuses the same
++ * mcc_handovers table and RLS ("agent_id in ... profile_id = auth.uid()")
++ * as the single-trip /handover screen, but lists every handover this agent
++ * has ever declared instead of just one trip, so Agent home can link to a
++ * "check status or history" card. Read-only: all writes stay on the
++ * SECURITY DEFINER RPCs used by trip.tsx / the manager's handovers.tsx.
++ */
++function AgentHandoversScreen() {
++  const { data: agent } = useAgentContext();
++
++  const { data: rows = [], isLoading } = useQuery({
++    queryKey: ["agent-handover-history", agent?.agentId],
++    enabled: Boolean(agent?.agentId),
++    queryFn: async () => {
++      const { data, error } = await supabase
++        .from("mcc_handovers")
++        .select(
++          "id, trip_id, trip_date, session, status, declared_quantity_litres, received_quantity_litres, variance_litres, variance_reason",
++        )
++        .eq("agent_id", agent!.agentId)
++        .order("created_at", { ascending: false })
++        .limit(50);
++      if (error) throw error;
++      return data ?? [];
++    },
++  });
++
++  const pending = rows.filter(
++    (r) => r.status === "declared" || r.status === "variance_flagged",
++  ).length;
++
++  return (
++    <AppShell mobileFirst>
++      <PageHeading
++        title="My handovers"
++        subtitle="What you declared at the MCC, and what the centre confirmed against it."
++      />
++
++      <div className="grid grid-cols-2 gap-3">
++        <StatCard label="Total handovers" value={rows.length} />
++        <StatCard label="Need MCC action" value={pending} />
++      </div>
++
++      <div className="surface-card mt-5 divide-y divide-border overflow-hidden">
++        {rows.map((row) => {
++          const copy = STATUS_COPY[row.status] ?? { label: row.status, status: "muted" as Status };
++          return (
++            <Link
++              key={row.id}
++              to="/handover"
++              search={{ trip: row.trip_id }}
++              className="flex items-center justify-between gap-3 p-4"
++            >
++              <div className="min-w-0">
++                <p className="text-sm font-medium">
++                  {new Date(`${row.trip_date}T00:00:00`).toLocaleDateString(undefined, {
++                    weekday: "short",
++                    day: "numeric",
++                    month: "short",
++                  })}{" "}
++                  · {row.session}
++                </p>
++                <p className="text-xs text-muted-foreground">
++                  Declared {Number(row.declared_quantity_litres).toFixed(1)} L
++                  {row.received_quantity_litres != null
++                    ? ` · Received ${Number(row.received_quantity_litres).toFixed(1)} L`
++                    : ""}
++                  {row.variance_litres != null && Number(row.variance_litres) !== 0
++                    ? ` · Δ ${Number(row.variance_litres).toFixed(1)} L`
++                    : ""}
++                </p>
++              </div>
++              <StatusBadge status={copy.status} label={copy.label} size="sm" />
++            </Link>
++          );
++        })}
++
++        {!isLoading && rows.length === 0 && (
++          <div className="flex flex-col items-center gap-2 p-8 text-center">
++            <Icon icon={Truck} size="xl" tone="active" />
++            <p className="text-sm text-muted-foreground">
++              No handovers yet. They're created automatically when you close out a trip.
++            </p>
++          </div>
++        )}
++      </div>
++
++      <Button asChild variant="outline" className="mt-6 h-12 w-full">
++        <Link to="/agent">
++          <ArrowLeft className="h-4 w-4" /> Back to home
++        </Link>
++      </Button>
++    </AppShell>
++  );
++}
+diff --git a/src/routes/_authenticated/agent.tsx b/src/routes/_authenticated/agent.tsx
+index eb748f7..9766ffd 100644
+--- a/src/routes/_authenticated/agent.tsx
++++ b/src/routes/_authenticated/agent.tsx
+@@ -1,4 +1,4 @@
+-import { useMemo } from "react";
++import { useMemo, useState } from "react";
+ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+ import { useServerFn } from "@tanstack/react-start";
+@@ -15,6 +15,8 @@ import {
+   ShieldCheck,
+   IndianRupee,
+   ListChecks,
++  Truck,
++  ChevronRight,
+ } from "lucide-react";
+ import { toast } from "sonner";
+ import { supabase } from "@/integrations/supabase/client";
+@@ -22,6 +24,8 @@ import { AppShell, PageHeading, StatCard } from "@/components/app-shell";
+ import { Button } from "@/components/ui/button";
+ import { Icon } from "@/components/ui/icon";
+ import { StatusBadge, type Status } from "@/components/ui/status-badge";
++import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
++import { exceptionLabel } from "@/lib/exceptions";
+ import { useCurrentUser } from "@/hooks/useCurrentUser";
+ import { useAgentContext } from "@/hooks/useAgentContext";
+ import { useOfflineQueue } from "@/hooks/useOfflineQueue";
+@@ -71,6 +75,13 @@ function today() {
+   return new Date().toISOString().slice(0, 10);
+ }
+ 
++const HANDOVER_STATUS_LABEL: Record<string, string> = {
++  declared: "Awaiting MCC receipt",
++  received: "Received",
++  variance_flagged: "Variance flagged",
++  acknowledged: "Acknowledged",
++};
++
+ function AgentHome() {
+   const { data: user } = useCurrentUser();
+   const { data: agent, isLoading: agentLoading } = useAgentContext();
+@@ -177,6 +188,71 @@ function AgentHome() {
+     },
+   });
+ 
++  // Item 3 — the "N open exceptions" strip is openable: fetch the actual
++  // rows (only once the agent taps it) so they can see what's wrong and
++  // resolve it right from Agent home, instead of only a bare count.
++  const [exceptionsOpen, setExceptionsOpen] = useState(false);
++  const { data: exceptionRows = [] } = useQuery({
++    queryKey: ["agent-open-exceptions-detail", agent?.agentId],
++    enabled: Boolean(agent?.agentId) && exceptionsOpen,
++    queryFn: async () => {
++      const { data, error } = await supabase
++        .from("trip_exceptions")
++        .select("id, type, reason, created_at, farmer_id, farmers(full_name)")
++        .eq("agent_id", agent!.agentId)
++        .eq("status", "open")
++        .gte("created_at", `${today()}T00:00:00Z`)
++        .order("created_at", { ascending: false });
++      if (error) throw error;
++      return data ?? [];
++    },
++  });
++
++  const resolveException = useMutation({
++    mutationFn: async (id: string) => {
++      const { data: auth } = await supabase.auth.getUser();
++      const { error } = await supabase
++        .from("trip_exceptions")
++        .update({
++          status: "resolved",
++          resolved_at: new Date().toISOString(),
++          resolved_by: auth.user?.id ?? null,
++        })
++        .eq("id", id);
++      if (error) throw error;
++    },
++    onSuccess: () => {
++      void queryClient.invalidateQueries({ queryKey: ["agent-open-exceptions"] });
++      void queryClient.invalidateQueries({ queryKey: ["agent-open-exceptions-detail"] });
++      toast.success("Exception resolved");
++    },
++    onError: (error: Error) => toast.error(error.message),
++  });
++
++  // Item 2 — handover status card: latest handover this agent declared, plus
++  // how many across their history still need MCC action, so Agent home
++  // links straight to the full history instead of the agent having to
++  // remember a trip id.
++  const { data: handoverSummary } = useQuery({
++    queryKey: ["agent-handover-summary", agent?.agentId],
++    enabled: Boolean(agent?.agentId),
++    queryFn: async () => {
++      const { data, error } = await supabase
++        .from("mcc_handovers")
++        .select("id, trip_id, status, declared_quantity_litres, variance_litres, trip_date")
++        .eq("agent_id", agent!.agentId)
++        .order("created_at", { ascending: false })
++        .limit(20);
++      if (error) throw error;
++      const rows = data ?? [];
++      return {
++        latest: rows[0] ?? null,
++        pending: rows.filter((r) => r.status === "declared" || r.status === "variance_flagged")
++          .length,
++      };
++    },
++  });
++
+   // Next action: the first farmer on the active trip's route who is neither
+   // collected nor already excused via an exception.
+   const { data: nextFarmer } = useQuery({
+@@ -616,14 +692,82 @@ function AgentHome() {
+       )}
+ 
+       {Boolean(openExceptions) && (
+-        <div className="surface-card mt-3 flex items-center gap-3 border-status-warning/30 bg-status-warning-soft p-4">
++        <button
++          type="button"
++          className="surface-card mt-3 flex w-full items-center gap-3 border-status-warning/30 bg-status-warning-soft p-4 text-left"
++          onClick={() => setExceptionsOpen(true)}
++        >
+           <Icon icon={AlertTriangle} size="md" tone="warning" />
+           <p className="flex-1 text-sm text-muted-foreground">
+             {openExceptions} open exception{openExceptions === 1 ? "" : "s"} logged today.
+           </p>
+-        </div>
++          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
++        </button>
+       )}
+ 
++      {/* Handover status/history card — see hooks above for the summary query. */}
++      {agent && handoverSummary?.latest && (
++        <Link
++          to="/agent-handovers"
++          className="surface-card mt-3 flex items-center gap-3 p-4"
++        >
++          <Icon icon={Truck} size="md" tone="active" />
++          <div className="flex-1">
++            <p className="text-sm font-medium">
++              Last handover: {Number(handoverSummary.latest.declared_quantity_litres).toFixed(1)} L
++              {" · "}
++              {HANDOVER_STATUS_LABEL[handoverSummary.latest.status] ?? handoverSummary.latest.status}
++            </p>
++            <p className="text-xs text-muted-foreground">
++              {handoverSummary.pending > 0
++                ? `${handoverSummary.pending} handover${handoverSummary.pending === 1 ? "" : "s"} need MCC action`
++                : "Tap to see your full handover history"}
++            </p>
++          </div>
++          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
++        </Link>
++      )}
++
++      <Dialog open={exceptionsOpen} onOpenChange={setExceptionsOpen}>
++        <DialogContent className="sm:max-w-md">
++          <DialogHeader>
++            <DialogTitle>Today's open exceptions</DialogTitle>
++          </DialogHeader>
++          <ul className="max-h-[60vh] divide-y divide-border overflow-y-auto">
++            {exceptionRows.map((e) => (
++              <li key={e.id} className="flex items-center justify-between gap-3 py-3">
++                <div className="min-w-0">
++                  <p className="text-sm font-medium">{exceptionLabel(e.type)}</p>
++                  <p className="truncate text-xs text-muted-foreground">
++                    {e.farmers?.full_name ? `${e.farmers.full_name} · ` : ""}
++                    {e.reason || "No note added"}
++                  </p>
++                  <p className="text-xs text-muted-foreground">
++                    {new Date(e.created_at).toLocaleTimeString([], {
++                      hour: "2-digit",
++                      minute: "2-digit",
++                    })}
++                  </p>
++                </div>
++                <Button
++                  size="sm"
++                  variant="outline"
++                  disabled={resolveException.isPending}
++                  onClick={() => resolveException.mutate(e.id)}
++                >
++                  Mark fixed
++                </Button>
++              </li>
++            ))}
++            {exceptionRows.length === 0 && (
++              <li className="py-6 text-center text-sm text-muted-foreground">
++                No open exceptions right now.
++              </li>
++            )}
++          </ul>
++        </DialogContent>
++      </Dialog>
++
+       {!agent?.routeId && agent && (
+         <div className="surface-card mt-5 flex flex-col items-center p-8 text-center">
+           <Icon icon={Milk} size="xl" tone="active" />
+diff --git a/src/routes/_authenticated/collections.tsx b/src/routes/_authenticated/collections.tsx
+index 1bf1846..84fca72 100644
+--- a/src/routes/_authenticated/collections.tsx
++++ b/src/routes/_authenticated/collections.tsx
+@@ -1,11 +1,20 @@
++import { useMemo, useState } from "react";
+ import { createFileRoute, Link } from "@tanstack/react-router";
+ import { useQuery } from "@tanstack/react-query";
+-import { ArrowLeft, CloudUpload, Droplets, RefreshCw } from "lucide-react";
++import { ArrowLeft, CloudUpload, Droplets, RefreshCw, Search, X } from "lucide-react";
+ import { supabase } from "@/integrations/supabase/client";
+ import { AppShell, PageHeading, StatCard } from "@/components/app-shell";
+ import { Button } from "@/components/ui/button";
+ import { Icon } from "@/components/ui/icon";
++import { Input } from "@/components/ui/input";
+ import { StatusBadge } from "@/components/ui/status-badge";
++import {
++  Select,
++  SelectContent,
++  SelectItem,
++  SelectTrigger,
++  SelectValue,
++} from "@/components/ui/select";
+ import { useAgentContext } from "@/hooks/useAgentContext";
+ import { useOfflineQueue } from "@/hooks/useOfflineQueue";
+ import { formatCurrency } from "@/lib/pricing";
+@@ -33,45 +42,224 @@ export const Route = createFileRoute("/_authenticated/collections")({
+   component: CollectionsScreen,
+ });
+ 
++/**
++ * ITEM 4 — period presets used by the "When" dropdown. Each maps to a
++ * `collected_at` lower bound computed at render time; "all" and "custom"
++ * are handled separately (custom exposes two date inputs instead).
++ */
++type Period = "all" | "today" | "week" | "month" | "quarter" | "custom";
++
++const PERIOD_LABEL: Record<Period, string> = {
++  all: "All time",
++  today: "Today",
++  week: "This week",
++  month: "This month",
++  quarter: "This quarter",
++  custom: "Custom range",
++};
++
++function startOfWeek(d: Date) {
++  const date = new Date(d);
++  const day = date.getDay(); // 0 = Sunday
++  const diff = (day + 6) % 7; // days since Monday
++  date.setDate(date.getDate() - diff);
++  date.setHours(0, 0, 0, 0);
++  return date;
++}
++
++function periodStart(period: Period): Date | null {
++  const now = new Date();
++  if (period === "today") {
++    const d = new Date(now);
++    d.setHours(0, 0, 0, 0);
++    return d;
++  }
++  if (period === "week") return startOfWeek(now);
++  if (period === "month") return new Date(now.getFullYear(), now.getMonth(), 1);
++  if (period === "quarter") {
++    const q = Math.floor(now.getMonth() / 3);
++    return new Date(now.getFullYear(), q * 3, 1);
++  }
++  return null;
++}
++
+ function CollectionsScreen() {
+   const { data: agent } = useAgentContext();
+   const { pending, online, flush } = useOfflineQueue();
+ 
++  const [period, setPeriod] = useState<Period>("all");
++  const [customFrom, setCustomFrom] = useState("");
++  const [customTo, setCustomTo] = useState("");
++  const [nameQuery, setNameQuery] = useState("");
++  const [locationQuery, setLocationQuery] = useState("");
++
++  const rangeFrom =
++    period === "custom" ? (customFrom ? new Date(customFrom) : null) : periodStart(period);
++  const rangeTo = period === "custom" && customTo ? new Date(`${customTo}T23:59:59`) : null;
++
++  const hasFilters =
++    period !== "all" || nameQuery.trim().length > 0 || locationQuery.trim().length > 0;
++
+   const { data: rows, isLoading } = useQuery({
+-    queryKey: ["agent-collections", agent?.agentId],
++    queryKey: [
++      "agent-collections",
++      agent?.agentId,
++      period,
++      period === "custom" ? customFrom : null,
++      period === "custom" ? customTo : null,
++    ],
+     enabled: Boolean(agent?.agentId),
+     queryFn: async () => {
+-      const { data } = await supabase
++      let query = supabase
+         .from("milk_collections")
+         .select(
+-          "id, collected_at, session, animal_type, quantity_litres, fat_pct, snf_pct, rate_per_litre, total_amount, status, risk_score, farmers(full_name, farmer_code)",
++          "id, collected_at, session, animal_type, quantity_litres, fat_pct, snf_pct, rate_per_litre, total_amount, status, risk_score, farmers(full_name, farmer_code, village)",
+         )
+         .eq("agent_id", agent!.agentId)
+-        .order("collected_at", { ascending: false })
+-        .limit(100);
++        .order("collected_at", { ascending: false });
++
++      // Date-filtered views may need to reach further back than the default
++      // "recent activity" cap, so only limit the unfiltered/default view.
++      if (rangeFrom) query = query.gte("collected_at", rangeFrom.toISOString());
++      if (rangeTo) query = query.lte("collected_at", rangeTo.toISOString());
++      query = rangeFrom || rangeTo ? query.limit(1000) : query.limit(100);
++
++      const { data, error } = await query;
++      if (error) throw error;
+       return data ?? [];
+     },
+   });
+ 
+-  const litres = (rows ?? []).reduce((s, r) => s + Number(r.quantity_litres ?? 0), 0);
+-  const amount = (rows ?? []).reduce((s, r) => s + Number(r.total_amount ?? 0), 0);
++  // Name and location (village) are filtered client-side — no extra round
++  // trip needed since the date-scoped query above already narrows things
++  // down, and this keeps the search feeling instant as the agent types.
++  const filteredRows = useMemo(() => {
++    const name = nameQuery.trim().toLowerCase();
++    const loc = locationQuery.trim().toLowerCase();
++    return (rows ?? []).filter((row) => {
++      const matchesName =
++        !name ||
++        row.farmers?.full_name?.toLowerCase().includes(name) ||
++        row.farmers?.farmer_code?.toLowerCase().includes(name);
++      const matchesLoc = !loc || row.farmers?.village?.toLowerCase().includes(loc);
++      return matchesName && matchesLoc;
++    });
++  }, [rows, nameQuery, locationQuery]);
+ 
+-  const groups = new Map<string, typeof rows>();
+-  for (const row of rows ?? []) {
++  const litres = filteredRows.reduce((s, r) => s + Number(r.quantity_litres ?? 0), 0);
++  const amount = filteredRows.reduce((s, r) => s + Number(r.total_amount ?? 0), 0);
++
++  const groups = new Map<string, typeof filteredRows>();
++  for (const row of filteredRows) {
+     const day = new Date(row.collected_at).toISOString().slice(0, 10);
+     groups.set(day, [...(groups.get(day) ?? []), row]);
+   }
+ 
+   return (
+     <AppShell mobileFirst>
+-      <PageHeading title="My collections" subtitle="Last 100 entries captured on this account." />
++      <PageHeading
++        title="My collections"
++        subtitle={
++          hasFilters
++            ? `${filteredRows.length} entr${filteredRows.length === 1 ? "y" : "ies"} matching your filters.`
++            : "Last 100 entries captured on this account."
++        }
++      />
+ 
+       <div className="grid grid-cols-3 gap-3">
+-        <StatCard label="Entries" value={rows?.length ?? 0} />
++        <StatCard label="Entries" value={filteredRows.length} />
+         <StatCard label="Litres" value={litres.toFixed(1)} />
+         <StatCard label="Value" value={formatCurrency(amount)} />
+       </div>
+ 
++      {/* FILTERS — when / name / location, per Item 4 */}
++      <div className="surface-card mt-4 space-y-3 p-4">
++        <div className="grid grid-cols-2 gap-3">
++          <div>
++            <label className="mb-1 block text-xs font-medium text-muted-foreground">When</label>
++            <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
++              <SelectTrigger className="h-10">
++                <SelectValue />
++              </SelectTrigger>
++              <SelectContent>
++                {(Object.keys(PERIOD_LABEL) as Period[]).map((p) => (
++                  <SelectItem key={p} value={p}>
++                    {PERIOD_LABEL[p]}
++                  </SelectItem>
++                ))}
++              </SelectContent>
++            </Select>
++          </div>
++          <div>
++            <label className="mb-1 block text-xs font-medium text-muted-foreground">
++              Farmer name / code
++            </label>
++            <div className="relative">
++              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
++              <Input
++                value={nameQuery}
++                onChange={(e) => setNameQuery(e.target.value)}
++                placeholder="Search name or code"
++                className="h-10 pl-8"
++              />
++            </div>
++          </div>
++        </div>
++
++        {period === "custom" && (
++          <div className="grid grid-cols-2 gap-3">
++            <div>
++              <label className="mb-1 block text-xs font-medium text-muted-foreground">From</label>
++              <Input
++                type="date"
++                value={customFrom}
++                onChange={(e) => setCustomFrom(e.target.value)}
++                className="h-10"
++              />
++            </div>
++            <div>
++              <label className="mb-1 block text-xs font-medium text-muted-foreground">To</label>
++              <Input
++                type="date"
++                value={customTo}
++                onChange={(e) => setCustomTo(e.target.value)}
++                className="h-10"
++              />
++            </div>
++          </div>
++        )}
++
++        <div>
++          <label className="mb-1 block text-xs font-medium text-muted-foreground">
++            Location / village
++          </label>
++          <Input
++            value={locationQuery}
++            onChange={(e) => setLocationQuery(e.target.value)}
++            placeholder="Search village"
++            className="h-10"
++          />
++        </div>
++
++        {hasFilters && (
++          <Button
++            variant="ghost"
++            size="sm"
++            className="h-8"
++            onClick={() => {
++              setPeriod("all");
++              setCustomFrom("");
++              setCustomTo("");
++              setNameQuery("");
++              setLocationQuery("");
++            }}
++          >
++            <X className="h-3.5 w-3.5" />
++            Clear filters
++          </Button>
++        )}
++      </div>
++
+       {pending > 0 && (
+         <div className="surface-card mt-4 flex items-center gap-3 p-4">
+           <Icon icon={CloudUpload} size="md" tone={online ? "active" : "warning"} />
+@@ -102,6 +290,7 @@ function CollectionsScreen() {
+                     <p className="truncate font-medium">{row.farmers?.full_name ?? "Farmer"}</p>
+                     <p className="text-xs text-muted-foreground">
+                       {row.farmers?.farmer_code} · {row.session} · {row.animal_type}
++                      {row.farmers?.village ? ` · ${row.farmers.village}` : ""}
+                     </p>
+                     <p className="mt-1 text-xs text-muted-foreground">
+                       Fat {row.fat_pct ?? "—"}% · SNF {row.snf_pct ?? "—"}% · ₹
+@@ -130,11 +319,13 @@ function CollectionsScreen() {
+           </section>
+         ))}
+ 
+-        {!isLoading && (rows?.length ?? 0) === 0 && (
++        {!isLoading && filteredRows.length === 0 && (
+           <div className="surface-card flex flex-col items-center p-8 text-center">
+             <Icon icon={Droplets} size="xl" tone="active" />
+             <p className="mt-2 text-sm text-muted-foreground">
+-              No collections yet. Start a trip and record your first entry.
++              {hasFilters
++                ? "No collections match these filters."
++                : "No collections yet. Start a trip and record your first entry."}
+             </p>
+           </div>
+         )}
+diff --git a/src/routes/_authenticated/trip.tsx b/src/routes/_authenticated/trip.tsx
+index 37968ee..461f90b 100644
+--- a/src/routes/_authenticated/trip.tsx
++++ b/src/routes/_authenticated/trip.tsx
+@@ -5,12 +5,10 @@ import { useServerFn } from "@tanstack/react-start";
+ import {
+   ArrowLeft,
+   CheckCircle2,
+-  ChevronDown,
+   MapPin,
+   Home,
+   Navigation2,
+   QrCode,
+-  LockKeyhole,
+   AlertTriangle,
+   CloudOff,
+ } from "lucide-react";
+@@ -47,6 +45,7 @@ import { getCoords } from "@/lib/geo";
+ import { computeRoute } from "@/lib/maps.functions";
+ import { QrScanner } from "@/components/qr-scanner";
+ import { cardCodeFor } from "@/lib/qr";
++import { exceptionLabel } from "@/lib/exceptions";
+ import { requireRole } from "@/lib/route-guards";
+ 
+ const AgentTripMap = lazy(() => import("@/components/agent-trip-map"));
+@@ -418,6 +417,33 @@ function TripScreen() {
+     onError: (error: Error) => toast.error(error.message),
+   });
+ 
++  // BUGFIX — route/point-level "Report issue" was inserting correctly (the
++  // toast just faded away), but nothing on the Trip screen ever showed the
++  // report afterwards: a stop's "problem" pin is masked by "current" while
++  // it's the stop you're standing at (see tripStops below), so the exact
++  // stop you just reported on never visibly changed. This resolves that —
++  // open point-level reports for the current stop are now listed right in
++  // its card, with a way to mark them fixed once actually resolved.
++  const resolvePointException = useMutation({
++    mutationFn: async (id: string) => {
++      const { data: auth } = await supabase.auth.getUser();
++      const { error } = await supabase
++        .from("trip_exceptions")
++        .update({
++          status: "resolved",
++          resolved_at: new Date().toISOString(),
++          resolved_by: auth.user?.id ?? null,
++        })
++        .eq("id", id);
++      if (error) throw error;
++    },
++    onSuccess: () => {
++      toast.success("Marked fixed");
++      void queryClient.invalidateQueries({ queryKey: ["trip-exceptions"] });
++    },
++    onError: (error: Error) => toast.error(error.message),
++  });
++
+   /*
+    * ALL FARMERS FOR QR SCANNING
+    */
+@@ -460,8 +486,14 @@ function TripScreen() {
+    */
+ 
+   const stopStatus = (point: PointWithFarmers): "done" | "upcoming" | "problem" => {
++    // BUGFIX — a stop with zero farmers assigned (e.g. "Point C — Alai" in
++    // your live route) could never reach "done": the check below required
++    // farmers.length > 0, so an empty stop stayed "upcoming"/"problem"
++    // forever and would eventually become the permanent currentStop with
++    // nothing to collect and no way to move past it. Zero farmers now
++    // means nothing to do here, so it's immediately done.
+     if (
+-      point.farmers.length > 0 &&
++      point.farmers.length === 0 ||
+       point.farmers.every((f) => collectedFarmers.has(f.id) || exceptedFarmers.has(f.id))
+     ) {
+       return "done";
+@@ -482,6 +514,12 @@ function TripScreen() {
+ 
+   const currentStop = firstIncompleteIndex >= 0 ? points[firstIncompleteIndex]! : null;
+ 
++  // Route/point-level (farmer_id null) exceptions logged against the stop
++  // currently front-and-centre — see resolvePointException above.
++  const currentStopIssues = currentStop
++    ? exceptions.filter((e) => e.route_point_id === currentStop.id && !e.farmer_id)
++    : [];
++
+   // PART 1 §4 — a manager/owner can lock the stop sequence when assigning a
+   // route; while locked, only the current stop's farmers can be collected
+   // from the "All stops" list (the featured card above is always the
+@@ -909,6 +947,44 @@ function TripScreen() {
+               </Button>
+             </div>
+ 
++            {/* Persistent confirmation that "Report issue" actually did
++                something — was previously only a toast that vanished,
++                leaving the card looking unchanged. See bugfix note above. */}
++            {currentStopIssues.length > 0 && (
++              <ul className="mt-3 space-y-2">
++                {currentStopIssues.map((issue) => (
++                  <li
++                    key={issue.id}
++                    className={`flex items-center justify-between gap-3 rounded-lg border p-3 text-sm ${
++                      issue.status === "open"
++                        ? "border-status-warning/30 bg-status-warning-soft"
++                        : "border-border bg-muted/30"
++                    }`}
++                  >
++                    <div className="min-w-0">
++                      <p className="font-medium">{exceptionLabel(issue.type)}</p>
++                      <p className="truncate text-xs text-muted-foreground">
++                        {issue.reason || "No note added"}
++                      </p>
++                    </div>
++                    {issue.status === "open" ? (
++                      <Button
++                        size="sm"
++                        variant="outline"
++                        className="shrink-0"
++                        disabled={resolvePointException.isPending}
++                        onClick={() => resolvePointException.mutate(issue.id)}
++                      >
++                        Mark fixed
++                      </Button>
++                    ) : (
++                      <StatusBadge status="success" label="Fixed" size="sm" />
++                    )}
++                  </li>
++                ))}
++              </ul>
++            )}
++
+             {openPoint === currentStop.id && (
+               <ul className="mt-3 divide-y divide-border rounded-lg border border-border">
+                 {currentStop.farmers.map((farmer) => (
+@@ -953,12 +1029,18 @@ function TripScreen() {
+         <div className="mb-4 text-center text-sm text-muted-foreground">Loading farmers...</div>
+       )}
+ 
+-      {/* ALL STOPS — compact stepper for the whole route */}
++      {/*
++        ALL STOPS — compact route overview only. Farmers are intentionally
++        NOT listed/expandable here: the per-farmer Collect/exception actions
++        live solely in the CURRENT STOP card above (map + "View farmers"),
++        so this list stays a quick glance at stop order/status instead of a
++        second, distracting place to manage farmers.
++      */}
+       <p className="mb-2 text-sm font-semibold text-muted-foreground">All stops</p>
+       <div className="space-y-2">
+         {points.map((point) => {
+-          const open = openPoint === point.id;
+           const status = tripStops.find((s) => s.id === point.id)?.status ?? "upcoming";
++          const hasOpenIssue = openExceptionPointIds.has(point.id);
+           const pinState: StopState =
+             status === "done"
+               ? "completed"
+@@ -971,71 +1053,24 @@ function TripScreen() {
+           return (
+             <div
+               key={point.id}
+-              className={`surface-card overflow-hidden ${status === "current" ? "ring-1 ring-status-active/40" : ""}`}
++              className={`surface-card flex items-center gap-3 p-3.5 ${status === "current" ? "ring-1 ring-status-active/40" : ""}`}
+             >
+-              <button
+-                type="button"
+-                className="flex w-full items-center justify-between gap-3 p-3.5 text-left"
+-                onClick={() => {
+-                  const next = open ? null : point.id;
+-                  setOpenPoint(next);
+-                  if (next) arrive.mutate(point.id);
+-                }}
+-              >
+-                <span className="flex items-center gap-3">
+-                  <StopPin state={pinState} sequence={point.sequence} size="sm" />
+-                  <span>
+-                    <span className="block text-sm font-semibold">
+-                      {point.sequence}. {point.name}
+-                    </span>
+-                    <span className="text-xs text-muted-foreground">
+-                      {point.farmers.length} farmers
+-                    </span>
+-                  </span>
+-                </span>
+-
+-                <ChevronDown
+-                  className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
+-                />
+-              </button>
+-
+-              {open && (
+-                <ul className="divide-y divide-border border-t border-border">
+-                  {point.farmers.map((farmer) => (
+-                    <li key={farmer.id} className="flex items-center justify-between gap-3 p-3.5">
+-                      <div>
+-                        <p className="text-sm font-medium">{farmer.full_name}</p>
+-                        <p className="text-xs text-muted-foreground">
+-                          {farmer.farmer_code}
+-                          {farmer.village ? ` · ${farmer.village}` : ""}
+-                        </p>
+-                      </div>
+-
+-                      {!collectedFarmers.has(farmer.id) &&
+-                      !exceptions.some((e) => e.farmer_id === farmer.id) &&
+-                      sequenceLocked &&
+-                      point.id !== currentStop?.id ? (
+-                        <Button
+-                          size="sm"
+-                          variant="outline"
+-                          disabled
+-                          title="Complete earlier stops first"
+-                        >
+-                          <LockKeyhole className="h-3.5 w-3.5" />
+-                          Locked
+-                        </Button>
+-                      ) : (
+-                        farmerAction(farmer, point.id)
+-                      )}
+-                    </li>
+-                  ))}
+-
+-                  {point.farmers.length === 0 && (
+-                    <li className="p-3.5 text-sm text-muted-foreground">
+-                      No farmers linked to this stop yet.
+-                    </li>
+-                  )}
+-                </ul>
++              <StopPin state={pinState} sequence={point.sequence} size="sm" />
++              <div className="min-w-0 flex-1">
++                <p className="truncate text-sm font-semibold">
++                  {point.sequence}. {point.name}
++                </p>
++                <p className="text-xs text-muted-foreground">
++                  {point.farmers.length} farmer{point.farmers.length === 1 ? "" : "s"}
++                </p>
++              </div>
++              {status === "done" && <StatusBadge status="success" label="Done" size="sm" />}
++              {/* Show the "Issue" badge even when this is also the current
++                  stop — previously "current" overrode "problem" here, so
++                  the exact stop you just reported an issue on never showed
++                  it (see bugfix note by resolvePointException above). */}
++              {hasOpenIssue && status !== "done" && (
++                <StatusBadge status="danger" label="Issue" size="sm" />
+               )}
+             </div>
+           );

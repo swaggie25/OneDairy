@@ -5,12 +5,10 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowLeft,
   CheckCircle2,
-  ChevronDown,
   MapPin,
   Home,
   Navigation2,
   QrCode,
-  LockKeyhole,
   AlertTriangle,
   CloudOff,
 } from "lucide-react";
@@ -47,6 +45,7 @@ import { getCoords } from "@/lib/geo";
 import { computeRoute } from "@/lib/maps.functions";
 import { QrScanner } from "@/components/qr-scanner";
 import { cardCodeFor } from "@/lib/qr";
+import { exceptionLabel } from "@/lib/exceptions";
 import { requireRole } from "@/lib/route-guards";
 
 const AgentTripMap = lazy(() => import("@/components/agent-trip-map"));
@@ -418,6 +417,33 @@ function TripScreen() {
     onError: (error: Error) => toast.error(error.message),
   });
 
+  // BUGFIX — route/point-level "Report issue" was inserting correctly (the
+  // toast just faded away), but nothing on the Trip screen ever showed the
+  // report afterwards: a stop's "problem" pin is masked by "current" while
+  // it's the stop you're standing at (see tripStops below), so the exact
+  // stop you just reported on never visibly changed. This resolves that —
+  // open point-level reports for the current stop are now listed right in
+  // its card, with a way to mark them fixed once actually resolved.
+  const resolvePointException = useMutation({
+    mutationFn: async (id: string) => {
+      const { data: auth } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from("trip_exceptions")
+        .update({
+          status: "resolved",
+          resolved_at: new Date().toISOString(),
+          resolved_by: auth.user?.id ?? null,
+        })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Marked fixed");
+      void queryClient.invalidateQueries({ queryKey: ["trip-exceptions"] });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
   /*
    * ALL FARMERS FOR QR SCANNING
    */
@@ -460,8 +486,14 @@ function TripScreen() {
    */
 
   const stopStatus = (point: PointWithFarmers): "done" | "upcoming" | "problem" => {
+    // BUGFIX — a stop with zero farmers assigned (e.g. "Point C — Alai" in
+    // your live route) could never reach "done": the check below required
+    // farmers.length > 0, so an empty stop stayed "upcoming"/"problem"
+    // forever and would eventually become the permanent currentStop with
+    // nothing to collect and no way to move past it. Zero farmers now
+    // means nothing to do here, so it's immediately done.
     if (
-      point.farmers.length > 0 &&
+      point.farmers.length === 0 ||
       point.farmers.every((f) => collectedFarmers.has(f.id) || exceptedFarmers.has(f.id))
     ) {
       return "done";
@@ -481,6 +513,12 @@ function TripScreen() {
   }));
 
   const currentStop = firstIncompleteIndex >= 0 ? points[firstIncompleteIndex]! : null;
+
+  // Route/point-level (farmer_id null) exceptions logged against the stop
+  // currently front-and-centre — see resolvePointException above.
+  const currentStopIssues = currentStop
+    ? exceptions.filter((e) => e.route_point_id === currentStop.id && !e.farmer_id)
+    : [];
 
   // PART 1 §4 — a manager/owner can lock the stop sequence when assigning a
   // route; while locked, only the current stop's farmers can be collected
@@ -909,6 +947,44 @@ function TripScreen() {
               </Button>
             </div>
 
+            {/* Persistent confirmation that "Report issue" actually did
+                something — was previously only a toast that vanished,
+                leaving the card looking unchanged. See bugfix note above. */}
+            {currentStopIssues.length > 0 && (
+              <ul className="mt-3 space-y-2">
+                {currentStopIssues.map((issue) => (
+                  <li
+                    key={issue.id}
+                    className={`flex items-center justify-between gap-3 rounded-lg border p-3 text-sm ${
+                      issue.status === "open"
+                        ? "border-status-warning/30 bg-status-warning-soft"
+                        : "border-border bg-muted/30"
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium">{exceptionLabel(issue.type)}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {issue.reason || "No note added"}
+                      </p>
+                    </div>
+                    {issue.status === "open" ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0"
+                        disabled={resolvePointException.isPending}
+                        onClick={() => resolvePointException.mutate(issue.id)}
+                      >
+                        Mark fixed
+                      </Button>
+                    ) : (
+                      <StatusBadge status="success" label="Fixed" size="sm" />
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+
             {openPoint === currentStop.id && (
               <ul className="mt-3 divide-y divide-border rounded-lg border border-border">
                 {currentStop.farmers.map((farmer) => (
@@ -953,12 +1029,18 @@ function TripScreen() {
         <div className="mb-4 text-center text-sm text-muted-foreground">Loading farmers...</div>
       )}
 
-      {/* ALL STOPS — compact stepper for the whole route */}
+      {/*
+        ALL STOPS — compact route overview only. Farmers are intentionally
+        NOT listed/expandable here: the per-farmer Collect/exception actions
+        live solely in the CURRENT STOP card above (map + "View farmers"),
+        so this list stays a quick glance at stop order/status instead of a
+        second, distracting place to manage farmers.
+      */}
       <p className="mb-2 text-sm font-semibold text-muted-foreground">All stops</p>
       <div className="space-y-2">
         {points.map((point) => {
-          const open = openPoint === point.id;
           const status = tripStops.find((s) => s.id === point.id)?.status ?? "upcoming";
+          const hasOpenIssue = openExceptionPointIds.has(point.id);
           const pinState: StopState =
             status === "done"
               ? "completed"
@@ -971,71 +1053,24 @@ function TripScreen() {
           return (
             <div
               key={point.id}
-              className={`surface-card overflow-hidden ${status === "current" ? "ring-1 ring-status-active/40" : ""}`}
+              className={`surface-card flex items-center gap-3 p-3.5 ${status === "current" ? "ring-1 ring-status-active/40" : ""}`}
             >
-              <button
-                type="button"
-                className="flex w-full items-center justify-between gap-3 p-3.5 text-left"
-                onClick={() => {
-                  const next = open ? null : point.id;
-                  setOpenPoint(next);
-                  if (next) arrive.mutate(point.id);
-                }}
-              >
-                <span className="flex items-center gap-3">
-                  <StopPin state={pinState} sequence={point.sequence} size="sm" />
-                  <span>
-                    <span className="block text-sm font-semibold">
-                      {point.sequence}. {point.name}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {point.farmers.length} farmers
-                    </span>
-                  </span>
-                </span>
-
-                <ChevronDown
-                  className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
-                />
-              </button>
-
-              {open && (
-                <ul className="divide-y divide-border border-t border-border">
-                  {point.farmers.map((farmer) => (
-                    <li key={farmer.id} className="flex items-center justify-between gap-3 p-3.5">
-                      <div>
-                        <p className="text-sm font-medium">{farmer.full_name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {farmer.farmer_code}
-                          {farmer.village ? ` · ${farmer.village}` : ""}
-                        </p>
-                      </div>
-
-                      {!collectedFarmers.has(farmer.id) &&
-                      !exceptions.some((e) => e.farmer_id === farmer.id) &&
-                      sequenceLocked &&
-                      point.id !== currentStop?.id ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled
-                          title="Complete earlier stops first"
-                        >
-                          <LockKeyhole className="h-3.5 w-3.5" />
-                          Locked
-                        </Button>
-                      ) : (
-                        farmerAction(farmer, point.id)
-                      )}
-                    </li>
-                  ))}
-
-                  {point.farmers.length === 0 && (
-                    <li className="p-3.5 text-sm text-muted-foreground">
-                      No farmers linked to this stop yet.
-                    </li>
-                  )}
-                </ul>
+              <StopPin state={pinState} sequence={point.sequence} size="sm" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold">
+                  {point.sequence}. {point.name}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {point.farmers.length} farmer{point.farmers.length === 1 ? "" : "s"}
+                </p>
+              </div>
+              {status === "done" && <StatusBadge status="success" label="Done" size="sm" />}
+              {/* Show the "Issue" badge even when this is also the current
+                  stop — previously "current" overrode "problem" here, so
+                  the exact stop you just reported an issue on never showed
+                  it (see bugfix note by resolvePointException above). */}
+              {hasOpenIssue && status !== "done" && (
+                <StatusBadge status="danger" label="Issue" size="sm" />
               )}
             </div>
           );
