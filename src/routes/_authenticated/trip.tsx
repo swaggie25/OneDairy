@@ -8,8 +8,6 @@ import {
   MapPin,
   Home,
   Navigation2,
-  Phone,
-  Printer,
   QrCode,
   AlertTriangle,
   CloudOff,
@@ -49,7 +47,6 @@ import { QrScanner } from "@/components/qr-scanner";
 import { cardCodeFor } from "@/lib/qr";
 import { exceptionLabel } from "@/lib/exceptions";
 import { requireRole } from "@/lib/route-guards";
-import { openReceiptPreview } from "@/lib/receipt";
 
 const AgentTripMap = lazy(() => import("@/components/agent-trip-map"));
 
@@ -78,7 +75,6 @@ type Farmer = {
   full_name: string;
   farmer_code: string;
   village: string | null;
-  phone: string | null;
 };
 
 type RoutePoint = {
@@ -115,9 +111,6 @@ function TripScreen() {
 
   const [scanOpen, setScanOpen] = useState(false);
 
-  // Reprint — pick which of today's saved receipts on this trip to reprint.
-  const [reprintOpen, setReprintOpen] = useState(false);
-
   // PHASE 1 §5 — Exception Basics. `exceptionTarget` is either a farmer
   // (unavailable/skipped) or null with routePointId set (route issue/other).
   const [exceptionTarget, setExceptionTarget] = useState<{
@@ -127,6 +120,11 @@ function TripScreen() {
   } | null>(null);
   const [exceptionType, setExceptionType] = useState("farmer_unavailable");
   const [exceptionReason, setExceptionReason] = useState("");
+
+  // ITEM 5 — after a point/route-level "Report issue" is logged, ask the
+  // agent whether to divert (navigate on) or keep working the current stop,
+  // instead of leaving them to figure out what to do next on their own.
+  const [postIssuePrompt, setPostIssuePrompt] = useState(false);
 
   // PHASE 3 — Route Completion Summary shown before the Agent commits to
   // closing the trip, so "Proceed to MCC" is a deliberate step with the
@@ -292,8 +290,7 @@ function TripScreen() {
           id,
           full_name,
           farmer_code,
-          village,
-          phone
+          village
         `,
         )
         .in("id", farmerIds)
@@ -347,16 +344,10 @@ function TripScreen() {
           id,
           farmer_id,
           quantity_litres,
-          total_amount,
-          session,
-          fat_pct,
-          snf_pct,
-          rate_per_litre,
-          collected_at
+          total_amount
         `,
         )
-        .eq("trip_id", trip.id)
-        .order("collected_at", { ascending: false });
+        .eq("trip_id", trip.id);
 
       if (error) {
         console.error("TRIP COLLECTION ERROR:", error);
@@ -424,9 +415,11 @@ function TripScreen() {
     },
     onSuccess: () => {
       toast.success("Exception logged");
+      const wasPointLevel = Boolean(exceptionTarget && !exceptionTarget.farmerId);
       setExceptionTarget(null);
       setExceptionReason("");
       void queryClient.invalidateQueries({ queryKey: ["trip-exceptions"] });
+      if (wasPointLevel) setPostIssuePrompt(true);
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -527,6 +520,16 @@ function TripScreen() {
   }));
 
   const currentStop = firstIncompleteIndex >= 0 ? points[firstIncompleteIndex]! : null;
+
+  // ITEM 5/6 — next stop by route sequence (not by completion state), used
+  // both for the "divert to next stop?" prompt after reporting an issue,
+  // and to tell the agent about farmer-less stops ahead so they know to
+  // just carry on from wherever they are instead of detouring for nothing.
+  const currentIndex = currentStop ? points.findIndex((p) => p.id === currentStop.id) : -1;
+  const nextStop = currentIndex >= 0 ? (points[currentIndex + 1] ?? null) : null;
+  const emptyStopsAhead = points.filter(
+    (p, i) => p.farmers.length === 0 && (currentIndex < 0 || i >= currentIndex),
+  );
 
   // Route/point-level (farmer_id null) exceptions logged against the stop
   // currently front-and-centre — see resolvePointException above.
@@ -999,29 +1002,27 @@ function TripScreen() {
               </ul>
             )}
 
+            {/* ITEM 6 — farmer-less stops ahead are auto-skipped (see
+                stopStatus bugfix above), but the agent should still be told
+                so an empty pin on the map doesn't look like a missed stop. */}
+            {emptyStopsAhead.length > 0 && (
+              <p className="mt-3 rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground">
+                {emptyStopsAhead.map((p) => p.name).join(", ")}{" "}
+                {emptyStopsAhead.length === 1 ? "has" : "have"} no farmers assigned — no need to
+                detour there, just continue on to the next stop after you finish collecting here.
+              </p>
+            )}
+
             {openPoint === currentStop.id && (
               <ul className="mt-3 divide-y divide-border rounded-lg border border-border">
                 {currentStop.farmers.map((farmer) => (
                   <li key={farmer.id} className="flex items-center justify-between gap-3 p-3">
-                    <div className="flex min-w-0 items-center gap-2">
-                      {farmer.phone && (
-                        <a
-                          href={`tel:${farmer.phone}`}
-                          title={`Call ${farmer.full_name}`}
-                          aria-label={`Call ${farmer.full_name}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-status-active/10 text-status-active"
-                        >
-                          <Phone className="h-4 w-4" />
-                        </a>
-                      )}
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">{farmer.full_name}</p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {farmer.farmer_code}
-                          {farmer.village ? ` · ${farmer.village}` : ""}
-                        </p>
-                      </div>
+                    <div>
+                      <p className="text-sm font-medium">{farmer.full_name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {farmer.farmer_code}
+                        {farmer.village ? ` · ${farmer.village}` : ""}
+                      </p>
                     </div>
                     {farmerAction(farmer, currentStop.id)}
                   </li>
@@ -1047,21 +1048,10 @@ function TripScreen() {
         </div>
       )}
 
-      <div className="mb-4 grid grid-cols-2 gap-2">
-        <Button variant="outline" className="h-12 w-full" onClick={() => setScanOpen(true)}>
-          <QrCode className="h-4 w-4" />
-          Scan farmer QR card
-        </Button>
-        <Button
-          variant="outline"
-          className="h-12 w-full"
-          disabled={todayCollections.length === 0}
-          onClick={() => setReprintOpen(true)}
-        >
-          <Printer className="h-4 w-4" />
-          Reprint receipt
-        </Button>
-      </div>
+      <Button variant="outline" className="mb-4 h-12 w-full" onClick={() => setScanOpen(true)}>
+        <QrCode className="h-4 w-4" />
+        Scan farmer QR card
+      </Button>
 
       {loadingFarmers && (
         <div className="mb-4 text-center text-sm text-muted-foreground">Loading farmers...</div>
@@ -1099,7 +1089,9 @@ function TripScreen() {
                   {point.sequence}. {point.name}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {point.farmers.length} farmer{point.farmers.length === 1 ? "" : "s"}
+                  {point.farmers.length === 0
+                    ? "No farmers — skipped"
+                    : `${point.farmers.length} farmer${point.farmers.length === 1 ? "" : "s"}`}
                 </p>
               </div>
               {status === "done" && <StatusBadge status="success" label="Done" size="sm" />}
@@ -1175,64 +1167,6 @@ function TripScreen() {
               });
             }}
           />
-        </DialogContent>
-      </Dialog>
-
-      {/* REPRINT — pick which of today's saved entries on this trip to
-          reprint. Same preview-first receipt helper as the post-save
-          "Print receipt" button, so it's never a silent direct print. */}
-      <Dialog open={reprintOpen} onOpenChange={setReprintOpen}>
-        <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Reprint receipt</DialogTitle>
-          </DialogHeader>
-
-          <ul className="divide-y divide-border rounded-lg border border-border">
-            {todayCollections.map((collection) => {
-              const farmer = farmers.find((f) => f.id === collection.farmer_id);
-              return (
-                <li key={collection.id} className="flex items-center justify-between gap-3 p-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{farmer?.full_name ?? "Farmer"}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {farmer?.farmer_code} · {Number(collection.quantity_litres ?? 0).toFixed(1)} L
-                      ·{" "}
-                      {new Date(collection.collected_at).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </p>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="shrink-0"
-                    onClick={() => {
-                      const opened = openReceiptPreview({
-                        farmerName: farmer?.full_name ?? "Farmer",
-                        farmerCode: farmer?.farmer_code ?? "",
-                        session: collection.session,
-                        quantityLitres: Number(collection.quantity_litres ?? 0),
-                        fatPct: collection.fat_pct != null ? Number(collection.fat_pct) : null,
-                        snfPct: collection.snf_pct != null ? Number(collection.snf_pct) : null,
-                        ratePerLitre: Number(collection.rate_per_litre ?? 0),
-                        totalAmount: Number(collection.total_amount ?? 0),
-                        collectedAt: collection.collected_at,
-                      });
-                      if (!opened) toast.error("Allow pop-ups to view the receipt.");
-                    }}
-                  >
-                    <Printer className="h-3.5 w-3.5" />
-                  </Button>
-                </li>
-              );
-            })}
-            {todayCollections.length === 0 && (
-              <li className="p-3 text-sm text-muted-foreground">
-                No entries saved on this trip yet.
-              </li>
-            )}
-          </ul>
         </DialogContent>
       </Dialog>
 
@@ -1319,6 +1253,44 @@ function TripScreen() {
               onClick={() => logException.mutate()}
             >
               Log exception
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ITEM 5 — after reporting a point-level issue, ask whether to
+          divert on to the next stop or keep working this one. */}
+      <Dialog open={postIssuePrompt} onOpenChange={setPostIssuePrompt}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Issue reported at {currentStop?.name}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {nextStop
+              ? `What would you like to do — keep working this stop, or head on to ${nextStop.name} now?`
+              : "This is the last stop on the route — keep working it, or head back to the MCC."}
+          </p>
+          <div className="flex flex-col gap-2">
+            {nextStop?.lat != null && nextStop?.lng != null && (
+              <Button asChild size="lg" className="h-12 w-full">
+                <a
+                  href={navigationUrl({ lat: nextStop.lat, lng: nextStop.lng })}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={() => setPostIssuePrompt(false)}
+                >
+                  <Navigation2 className="h-4 w-4" />
+                  Navigate to {nextStop.name}
+                </a>
+              </Button>
+            )}
+            <Button
+              size="lg"
+              variant="outline"
+              className="h-12 w-full"
+              onClick={() => setPostIssuePrompt(false)}
+            >
+              Stay at this stop
             </Button>
           </div>
         </DialogContent>
