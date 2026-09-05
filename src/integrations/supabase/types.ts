@@ -323,6 +323,7 @@ export type Database = {
           ifsc: string | null
           mcc_id: string
           phone: string | null
+          photo_url: string | null
           profile_id: string | null
           status: string
           updated_at: string
@@ -339,6 +340,7 @@ export type Database = {
           ifsc?: string | null
           mcc_id: string
           phone?: string | null
+          photo_url?: string | null
           profile_id?: string | null
           status?: string
           updated_at?: string
@@ -355,6 +357,7 @@ export type Database = {
           ifsc?: string | null
           mcc_id?: string
           phone?: string | null
+          photo_url?: string | null
           profile_id?: string | null
           status?: string
           updated_at?: string
@@ -667,6 +670,7 @@ export type Database = {
           created_by: string | null
           distance_from_point_m: number | null
           farmer_id: string
+          farmer_phone_used: string | null
           fat_pct: number | null
           geofence_radius_m: number | null
           gps_accuracy_m: number | null
@@ -675,6 +679,7 @@ export type Database = {
           id: string
           mcc_id: string
           offline_synced_at: string | null
+          person_present_type: string
           quality_override_reason: string | null
           quantity_litres: number
           rate_per_litre: number
@@ -689,7 +694,11 @@ export type Database = {
           total_amount: number
           trip_id: string | null
           updated_at: string
+          verification_attempted_at: string | null
+          verification_completed_at: string | null
+          verification_method: string
           verification_result: string | null
+          verification_status: string
           verified_at: string | null
           verified_by: string | null
           water_adulteration_flag: boolean
@@ -707,6 +716,7 @@ export type Database = {
           created_by?: string | null
           distance_from_point_m?: number | null
           farmer_id: string
+          farmer_phone_used?: string | null
           fat_pct?: number | null
           geofence_radius_m?: number | null
           gps_accuracy_m?: number | null
@@ -715,6 +725,7 @@ export type Database = {
           id?: string
           mcc_id: string
           offline_synced_at?: string | null
+          person_present_type?: string
           quality_override_reason?: string | null
           quantity_litres: number
           rate_per_litre?: number
@@ -729,7 +740,11 @@ export type Database = {
           total_amount?: number
           trip_id?: string | null
           updated_at?: string
+          verification_attempted_at?: string | null
+          verification_completed_at?: string | null
+          verification_method?: string
           verification_result?: string | null
+          verification_status?: string
           verified_at?: string | null
           verified_by?: string | null
           water_adulteration_flag?: boolean
@@ -747,6 +762,7 @@ export type Database = {
           created_by?: string | null
           distance_from_point_m?: number | null
           farmer_id?: string
+          farmer_phone_used?: string | null
           fat_pct?: number | null
           geofence_radius_m?: number | null
           gps_accuracy_m?: number | null
@@ -755,6 +771,7 @@ export type Database = {
           id?: string
           mcc_id?: string
           offline_synced_at?: string | null
+          person_present_type?: string
           quality_override_reason?: string | null
           quantity_litres?: number
           rate_per_litre?: number
@@ -769,7 +786,11 @@ export type Database = {
           total_amount?: number
           trip_id?: string | null
           updated_at?: string
+          verification_attempted_at?: string | null
+          verification_completed_at?: string | null
+          verification_method?: string
           verification_result?: string | null
+          verification_status?: string
           verified_at?: string | null
           verified_by?: string | null
           water_adulteration_flag?: boolean
@@ -1863,7 +1884,9 @@ export type Database = {
           p_gps_accuracy: number
           p_gps_lat: number
           p_gps_lng: number
+          p_farmer_phone_used?: string
           p_mcc_id: string
+          p_person_present_type?: string
           p_quality_override_reason?: string
           p_quantity_litres: number
           p_rate_per_litre: number
@@ -1876,6 +1899,10 @@ export type Database = {
           p_temperature: number
           p_total_amount: number
           p_trip_id: string
+          p_verification_attempted_at?: string
+          p_verification_completed_at?: string
+          p_verification_method?: string
+          p_verification_status?: string
           p_water_adulteration_flag: boolean
           p_water_adulteration_pct: number
         }
@@ -1891,6 +1918,7 @@ export type Database = {
           created_by: string | null
           distance_from_point_m: number | null
           farmer_id: string
+          farmer_phone_used: string | null
           fat_pct: number | null
           geofence_radius_m: number | null
           gps_accuracy_m: number | null
@@ -1899,6 +1927,7 @@ export type Database = {
           id: string
           mcc_id: string
           offline_synced_at: string | null
+          person_present_type: string
           quality_override_reason: string | null
           quantity_litres: number
           rate_per_litre: number
@@ -1913,7 +1942,11 @@ export type Database = {
           total_amount: number
           trip_id: string | null
           updated_at: string
+          verification_attempted_at: string | null
+          verification_completed_at: string | null
+          verification_method: string
           verification_result: string | null
+          verification_status: string
           verified_at: string | null
           verified_by: string | null
           water_adulteration_flag: boolean

@@ -52,6 +52,16 @@ export type MilkEntryTarget = {
   routePointId?: string | null;
   tripId?: string | null;
   source: "agent" | "centre";
+  // FARMER VERIFICATION — captured on the verification screen before this
+  // form ever opens (spec §5-§9). Optional: centre walk-ins and any other
+  // caller that doesn't route through verification fall back to the
+  // database defaults (FARMER / NONE / NOT_REQUIRED).
+  personPresentType?: "FARMER" | "REPRESENTATIVE";
+  verificationMethod?: "NONE" | "PHONE";
+  verificationStatus?: "NOT_REQUIRED" | "PENDING" | "VERIFIED" | "FAILED";
+  verificationAttemptedAt?: string | null;
+  verificationCompletedAt?: string | null;
+  farmerPhoneUsed?: string | null;
 };
 
 function num(value: string): number | null {
@@ -321,6 +331,12 @@ export function MilkEntryForm({
       gps_lng: coords.lng ?? geofence.coords.lng,
       gps_accuracy: coords.accuracy ?? geofence.coords.accuracy,
       collected_at: new Date().toISOString(),
+      person_present_type: target.personPresentType ?? "FARMER",
+      verification_method: target.verificationMethod ?? "NONE",
+      verification_status: target.verificationStatus ?? "NOT_REQUIRED",
+      verification_attempted_at: target.verificationAttemptedAt ?? null,
+      verification_completed_at: target.verificationCompletedAt ?? null,
+      farmer_phone_used: target.farmerPhoneUsed ?? null,
     };
 
     enqueue(entry);
