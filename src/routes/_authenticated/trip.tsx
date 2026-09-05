@@ -1028,6 +1028,7 @@ function TripScreen() {
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
+                      {farmerAction(farmer, currentStop.id)}
                       {farmer.phone && (
                         <Button
                           asChild
@@ -1042,7 +1043,6 @@ function TripScreen() {
                           </a>
                         </Button>
                       )}
-                      {farmerAction(farmer, currentStop.id)}
                     </div>
                   </li>
                 ))}
