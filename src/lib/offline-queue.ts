@@ -44,6 +44,15 @@ export type QueuedCollection = {
   gps_lng: number | null;
   gps_accuracy: number | null;
   collected_at: string;
+  // FARMER VERIFICATION (spec §5-§9, §17) — who physically handed over the
+  // milk and how that was verified. Optional so older queued entries and
+  // non-agent sources keep working; the RPC defaults these server-side.
+  person_present_type?: "FARMER" | "REPRESENTATIVE";
+  verification_method?: "NONE" | "PHONE";
+  verification_status?: "NOT_REQUIRED" | "PENDING" | "VERIFIED" | "FAILED";
+  verification_attempted_at?: string | null;
+  verification_completed_at?: string | null;
+  farmer_phone_used?: string | null;
 };
 
 type Listener = (count: number) => void;
@@ -127,6 +136,12 @@ export async function flushQueue(): Promise<FlushResult> {
         p_gps_lng: item.gps_lng,
         p_gps_accuracy: item.gps_accuracy,
         p_collected_at: item.collected_at,
+        p_person_present_type: item.person_present_type ?? "FARMER",
+        p_verification_method: item.verification_method ?? "NONE",
+        p_verification_status: item.verification_status ?? "NOT_REQUIRED",
+        p_verification_attempted_at: item.verification_attempted_at ?? null,
+        p_verification_completed_at: item.verification_completed_at ?? null,
+        p_farmer_phone_used: item.farmer_phone_used ?? null,
       });
       if (error) {
         // Duplicate means it already landed; anything else stays queued so

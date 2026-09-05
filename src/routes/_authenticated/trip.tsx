@@ -35,6 +35,10 @@ import { StopPin, type StopState } from "@/components/ui/stop-pin";
 import { SegmentedProgress } from "@/components/ui/segmented-progress";
 
 import { MilkEntryForm, type MilkEntryTarget } from "@/components/milk-entry-form";
+import {
+  FarmerVerificationPanel,
+  type FarmerVerificationResult,
+} from "@/components/farmer-verification-panel";
 import type { TripStop } from "@/components/agent-trip-map";
 
 import { useAgentContext } from "@/hooks/useAgentContext";
@@ -110,6 +114,11 @@ function TripScreen() {
   const [openPoint, setOpenPoint] = useState<string | null>(null);
 
   const [target, setTarget] = useState<MilkEntryTarget | null>(null);
+
+  // FARMER VERIFICATION — set the instant a farmer is scanned/selected;
+  // the verification panel renders while this is non-null, and only turns
+  // into `target` (opening MilkEntryForm) once verification passes.
+  const [verifyTarget, setVerifyTarget] = useState<MilkEntryTarget | null>(null);
 
   const [scanOpen, setScanOpen] = useState(false);
 
@@ -347,7 +356,8 @@ function TripScreen() {
           id,
           farmer_id,
           quantity_litres,
-          total_amount
+          total_amount,
+          collected_at
         `,
         )
         .eq("trip_id", trip.id);
@@ -794,7 +804,7 @@ function TripScreen() {
         <Button
           size="sm"
           onClick={() =>
-            setTarget({
+            setVerifyTarget({
               farmerId: farmer.id,
               farmerName: farmer.full_name,
               farmerCode: farmer.farmer_code,
@@ -1159,15 +1169,12 @@ function TripScreen() {
                 return;
               }
 
-              if (collectedFarmers.has(match.id)) {
-                setScanOpen(false);
-                toast.error(`${match.full_name} is already marked Done on this trip.`);
-                return;
-              }
-
+              // A farmer already collected still opens the verification
+              // panel — it shows "Collection Already Recorded" (spec §12)
+              // instead of silently blocking the scan.
               setScanOpen(false);
 
-              setTarget({
+              setVerifyTarget({
                 farmerId: match.id,
 
                 farmerName: match.full_name,
@@ -1186,6 +1193,48 @@ function TripScreen() {
               });
             }}
           />
+        </DialogContent>
+      </Dialog>
+
+      {/* FARMER VERIFICATION — identity, payment context, who's-present +
+          call verification. Renders before MilkEntryForm ever opens. */}
+
+      <Dialog
+        open={Boolean(verifyTarget)}
+        onOpenChange={(open) => {
+          if (!open) setVerifyTarget(null);
+        }}
+      >
+        <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Verify Farmer</DialogTitle>
+          </DialogHeader>
+
+          {verifyTarget && (
+            <FarmerVerificationPanel
+              farmerId={verifyTarget.farmerId}
+              farmerName={verifyTarget.farmerName}
+              farmerCode={verifyTarget.farmerCode}
+              mccId={verifyTarget.mccId}
+              routeName={agent?.routeName}
+              alreadyCollected={(() => {
+                const existing = todayCollections.find(
+                  (c) => c.farmer_id === verifyTarget.farmerId,
+                );
+                return existing
+                  ? {
+                      quantityLitres: Number(existing.quantity_litres ?? 0),
+                      collectedAt: existing.collected_at as string,
+                    }
+                  : null;
+              })()}
+              onCancel={() => setVerifyTarget(null)}
+              onContinue={(result: FarmerVerificationResult) => {
+                setTarget({ ...verifyTarget, ...result });
+                setVerifyTarget(null);
+              }}
+            />
+          )}
         </DialogContent>
       </Dialog>
 
