@@ -952,7 +952,8 @@ function TripScreen() {
               </Button>
               <Button
                 variant="outline"
-                className="h-11"
+                className="h-11 shrink-0 px-3"
+                title="Report issue"
                 onClick={() => {
                   setExceptionType("route_issue");
                   setExceptionTarget({
@@ -963,7 +964,7 @@ function TripScreen() {
                 }}
               >
                 <AlertTriangle className="h-4 w-4" />
-                Report issue
+                <span className="sr-only">Report issue</span>
               </Button>
             </div>
 
@@ -1019,26 +1020,25 @@ function TripScreen() {
             {openPoint === currentStop.id && (
               <ul className="mt-3 divide-y divide-border rounded-lg border border-border">
                 {currentStop.farmers.map((farmer) => (
-                  <li key={farmer.id} className="flex items-center justify-between gap-3 p-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium">{farmer.full_name}</p>
-                      <p className="text-xs text-muted-foreground">
+                  <li key={farmer.id} className="flex flex-wrap items-center gap-y-2 gap-x-3 p-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{farmer.full_name}</p>
+                      <p className="truncate text-xs text-muted-foreground">
                         {farmer.farmer_code}
                         {farmer.village ? ` · ${farmer.village}` : ""}
                       </p>
                     </div>
-                    <div className="flex shrink-0 items-center gap-2">
+                    <div className="ml-auto flex shrink-0 items-center gap-1.5">
                       {farmerAction(farmer, currentStop.id)}
                       {farmer.phone && (
                         <Button
                           asChild
-                          size="icon"
+                          size="sm"
                           variant="outline"
-                          className="h-9 w-9 shrink-0"
                           title={`Call ${farmer.full_name}`}
                         >
                           <a href={`tel:${farmer.phone}`} onClick={(e) => e.stopPropagation()}>
-                            <Phone className="h-4 w-4" />
+                            <Phone className="h-3.5 w-3.5" />
                             <span className="sr-only">Call {farmer.full_name}</span>
                           </a>
                         </Button>

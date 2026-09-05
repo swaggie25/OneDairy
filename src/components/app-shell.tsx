@@ -175,13 +175,13 @@ export function StatCard({
   icon?: ReactNode | undefined;
 }) {
   return (
-    <div className="surface-card p-4">
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-sm font-medium text-muted-foreground">{label}</p>
-        {icon && <span className="text-primary">{icon}</span>}
+    <div className="surface-card min-w-0 p-3">
+      <div className="flex items-start justify-between gap-2">
+        <p className="truncate text-sm font-medium text-muted-foreground">{label}</p>
+        {icon && <span className="shrink-0 text-primary">{icon}</span>}
       </div>
-      <p className="mt-2 text-2xl font-bold tracking-tight">{value}</p>
-      {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
+      <p className="mt-2 truncate text-xl font-bold tracking-tight">{value}</p>
+      {hint && <p className="mt-1 truncate text-xs text-muted-foreground">{hint}</p>}
     </div>
   );
 }
