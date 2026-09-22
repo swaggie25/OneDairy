@@ -33,8 +33,8 @@ import type { CapacitorConfig } from "@capacitor/cli";
  */
 
 const isDev = process.env.CAP_ENV === "dev";
-const DEV_SERVER_URL = process.env.CAP_DEV_URL ?? "http://192.168.1.6:8080/auth";
-const PROD_SERVER_URL = process.env.CAP_PROD_URL ?? "http://192.168.1.6:8080/auth";
+const DEV_SERVER_URL = process.env.CAP_DEV_URL ?? "http://172.30.199.55:8080/auth";
+const PROD_SERVER_URL = process.env.CAP_PROD_URL ?? "http://172.30.199.55:8080/auth";
 
 const config: CapacitorConfig = {
   appId: "com.dairyone.agent",
